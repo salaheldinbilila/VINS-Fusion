@@ -22,6 +22,7 @@
 #include <nav_msgs/Path.h>
 #include "LocalCartesian.hpp"
 #include "tic_toc.h"
+#include <fstream>
 
 using namespace std;
 
@@ -33,7 +34,10 @@ public:
 	void inputGPS(double t, double latitude, double longitude, double altitude, double posAccuracy);
 	void inputOdom(double t, Eigen::Vector3d OdomP, Eigen::Quaterniond OdomQ);
 	void getGlobalOdom(Eigen::Vector3d &odomP, Eigen::Quaterniond &odomQ);
+	void inputPPKviz(float stamp, float templat, float templon, float tempalt, float sdn);
 	nav_msgs::Path global_path;
+	nav_msgs::Path gps_path;
+	nav_msgs::Path ppk_path;
 
 private:
 	void GPS2XYZ(double latitude, double longitude, double altitude, double* xyz);
@@ -49,6 +53,14 @@ private:
 	GeographicLib::LocalCartesian geoConverter;
 	std::mutex mPoseMap;
 	Eigen::Matrix4d WGPS_T_WVIO;
+        Eigen::Matrix4d WGPS_T_WVIO_viz;
+        int update_count;
+        int GTframeCount;
+        std::ofstream outfileOdom;
+        std::ofstream outfileGt;
+	std::ofstream outfileVINS; //rav
+	std::ofstream outfileGPS; //rav
+	std::ofstream outfileFusion; //rav
 	Eigen::Vector3d lastP;
 	Eigen::Quaterniond lastQ;
 	std::thread threadOpt;
