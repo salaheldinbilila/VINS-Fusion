@@ -18,6 +18,14 @@
 #include <fstream>
 #include <map>
 
+// Segmentation/detection classes to their respective numbering list
+#define PAVED 1
+#define GRASS 3
+#define CAR 17
+#define BUS 23
+#define TRUCK 24
+#define PERSON 15
+
 using namespace std;
 
 const double FOCAL_LENGTH = 460.0;
@@ -50,6 +58,10 @@ extern int ROLLING_SHUTTER;
 extern int ROW, COL;
 extern int NUM_OF_CAM;
 extern int STEREO;
+extern int SEG;
+extern int DET;
+extern std::vector<uchar> seg_classes;
+extern std::vector<uchar> det_classes;
 extern int USE_IMU;
 extern int MULTIPLE_THREAD;
 // pts_gt for debug purpose;

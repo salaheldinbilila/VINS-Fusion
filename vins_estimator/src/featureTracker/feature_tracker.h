@@ -42,6 +42,7 @@ public:
     void readIntrinsicParameter(const vector<string> &calib_file);
     void showUndistortion(const string &name);
     void rejectWithF();
+    void reject_mask(const cv::Mat _img,const vector<uchar> classes);
     void undistortedPoints();
     vector<cv::Point2f> undistortedPts(vector<cv::Point2f> &pts, camodocal::CameraPtr cam);
     vector<cv::Point2f> ptsVelocity(vector<int> &ids, vector<cv::Point2f> &pts, 
@@ -58,12 +59,14 @@ public:
     void removeOutliers(set<int> &removePtsIds);
     cv::Mat getTrackImage();
     bool inBorder(const cv::Point2f &pt);
-
+    
     int row, col;
     cv::Mat imTrack;
     cv::Mat mask;
     cv::Mat fisheye_mask;
     cv::Mat prev_img, cur_img;
+    cv::Mat seg_img;     // segmentation image passing
+    cv::Mat det_img;     // segmentation image passing
     vector<cv::Point2f> n_pts;
     vector<cv::Point2f> predict_pts;
     vector<cv::Point2f> predict_pts_debug;

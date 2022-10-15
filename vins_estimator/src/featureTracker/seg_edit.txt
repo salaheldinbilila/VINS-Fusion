@@ -1,0 +1,40 @@
+#include "feature_tracker.h"
+#define PAVED 1
+#define GRASS 3
+// ROS Node additions
+queue<sensor_msgs::ImageConstPtr> seg_buf;
+
+void seg_callback(const sensor_msgs::ImageConstPtr &img_msg)
+{
+    m_buf.lock();
+    seg_buf.push(img_msg);
+    m_buf.unlock();
+}
+
+int main(int argc, char **argv)
+{
+    ros::Subscriber sub_seg = n.subscribe('/semantic', 100, seg_callback);
+}
+
+// Segmentation method in feature tracker
+char classes[] = {GRASS};
+// needed paramters from class: vector<cv::Point2f> cur_pts, cv::Mat seg_img, vector<uchar>status
+void FeatureTracker::segmentation()
+{
+    char val;
+    for (int i = 0; i < int(cur_pts.size()); i++)
+    {
+        for (auto it : classes)
+        {
+            val = seg_img.at<char>(cur_pts[i]);
+            if (val==it)
+                status[i]==1;
+            else
+                status[i]==0;
+        }
+    }
+    reduceVector(cur_pts, status);
+    reduceVector(cur_un_pts, status);
+    reduceVector(ids, status);
+    reduceVector(track_cnt, status);
+}

@@ -14,35 +14,28 @@
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 
+//Begin - add counter variables
 int optcounter = 0;
 int gpsPosCounter = 0;
 int vinsPosCounter = 0;
 int updateGlobalPathCount = 0;
+//end - add counter variables
 
 
 GlobalOptimization::GlobalOptimization():
 outfileOdom("resultsOdom.txt", std::ios_base::trunc),
 outfileGt("resultsGt.txt", std::ios_base::trunc),
-//outfileVINS("VINS_LH.txt", std::ios_base::trunc),
-//outfileGPS("GPS_LH.txt", std::ios_base::trunc),
-//outfileFusion("Fusion_LH.txt", std::ios_base::trunc)
-outfileVINS("VINS_bell412_dataset1_ppk.txt", std::ios_base::trunc),
-outfileGPS("GPS_bell412_dataset1_ppk.txt", std::ios_base::trunc),
-outfileFusion("Fusion_bell412_dataset1_ppk.txt", std::ios_base::trunc)
+//1. begin - Add files here
+outfileVINS("VINS_bell412_dataset6_ppk.txt", std::ios_base::trunc),
+outfileGPS("GPS_bell412_dataset6_ppk.txt", std::ios_base::trunc),
+outfileFusion("Fusion_bell412_dataset6_ppk.txt", std::ios_base::trunc)
+//1. end - add text files
+
 {
     initGPS = false;
     newGPS = false;
     WGPS_T_WVIO = Eigen::Matrix4d::Identity(); //update this to the difference
     WGPS_T_WVIO_viz = Eigen::Matrix4d::Identity();
-    //define new initial transformation for the global path - taken after optimization
-    Eigen::Matrix4d initRotAfterOpti;
-    initRotAfterOpti <<  0.495238,   0.865899,    0.0704165,  5.9154,
-                         0.867781,  -0.496895,    0.00713753, 2.29296,
-                         0.04117,    0.0575713,  -0.997492,   2.68105,
-                         0,          0,           0,          1;
-
-    //WGPS_T_WVIO = initRotAfterOpti; //update this to the difference
-    //WGPS_T_WVIO_viz = initRotAfterOpti;
     update_count =0;
     GTframeCount = 0;
     threadOpt = std::thread(&GlobalOptimization::optimize, this);
@@ -63,17 +56,6 @@ void GlobalOptimization::GPS2XYZ(double latitude, double longitude, double altit
     geoConverter.Forward(latitude, longitude, altitude, xyz[0], xyz[1], xyz[2]);
     printf("la: %f lo: %f al: %f\n", latitude, longitude, altitude);
     printf("gps x: %f y: %f z: %f\n", xyz[0], xyz[1], xyz[2]);
-
-    //wtite GPS to file
-    /*std::ofstream foutE("GPSPositionsLH.txt", std::ios::app); 
-    gpsPosCounter++;
-    foutE.setf(std::ios::fixed, std::ios::floatfield);
-    foutE.precision(0);
-    foutE << gpsPosCounter << " ";
-    foutE.precision(6);
-    foutE << xyz[0]  << " "
-          << xyz[1]  << " "
-          << xyz[2]  << std::endl;*/
 }
 
 void GlobalOptimization::inputOdom(double t, Eigen::Vector3d OdomP, Eigen::Quaterniond OdomQ)
@@ -83,12 +65,9 @@ void GlobalOptimization::inputOdom(double t, Eigen::Vector3d OdomP, Eigen::Quate
     					     OdomQ.w(), OdomQ.x(), OdomQ.y(), OdomQ.z()};
     localPoseMap[t] = localPose;
 
-    //write file - VINS
+    //2. Begin - VINS CSV wrighting
     Eigen::Matrix3d odomR = OdomQ.normalized().toRotationMatrix();
-    //std::cout << "VINS Rotm: \n" << odomR << std::endl;
-    //std::ofstream foutE("VINS_LH.txt", std::ios::app);
     std::ofstream foutE("VINS_bell412_dataset1_ppk.txt", std::ios::app); 
-    //std::ofstream foutE("resultsOdomRaw.txt", std::ios::app);
     vinsPosCounter++;
     foutE.setf(std::ios::fixed, std::ios::floatfield);
     foutE.precision(0);
@@ -107,9 +86,7 @@ void GlobalOptimization::inputOdom(double t, Eigen::Vector3d OdomP, Eigen::Quate
             << odomR(2,1) << " "
             << odomR(2,2) << " "
             << OdomP.z()  << std::endl;
-          //<< OdomP.x()  << " "
-          //<< OdomP.y()  << " "
-          //<< OdomP.z()  << std::endl;
+    //2. End - VINS CSV wrighting
 
     //rav begin
     //add the static transformation here - WGPS_T_WVIO - rav
@@ -212,8 +189,8 @@ void GlobalOptimization::inputGPS(double t, double latitude, double longitude, d
 	GPSPositionMap[t] = tmp;
     newGPS = true;
 
-    std::ofstream foutF("GPS_bell412_dataset1_ppk.txt", std::ios::app);
-    //std::ofstream foutF("GPS_LH.txt", std::ios::app); 
+    //3. Begin - GPS CSV wrighting
+    std::ofstream foutF("GPS_bell412_dataset6_ppk.txt", std::ios::app);
     gpsPosCounter++;
     foutF.setf(std::ios::fixed, std::ios::floatfield);
     foutF.precision(0);
@@ -223,6 +200,7 @@ void GlobalOptimization::inputGPS(double t, double latitude, double longitude, d
           << xyz[0]  << " "
           << xyz[1]  << " "
           << xyz[2]  << std::endl;
+    //3. End - GPS CSV wrighting
 
 }
 
@@ -418,7 +396,7 @@ void GlobalOptimization::updateGlobalPath()
         //write to file
     }
 
-    //save the path here when value > 6769
+    //4. add variable increment
     updateGlobalPathCount++;
 
     //save results for KITTI evaluation tool
@@ -548,12 +526,14 @@ void GlobalOptimization::updateGlobalPath()
                     std::cout << "Map Update Counter:  " << updateGlobalPathCount << '\n';
                 }
 
-                if(updateGlobalPathCount >= 545) //bell412_dataset1 - 149|bell412_dataset5 - 136 fusion| dataset3 - 150 | dataset4 - 155
-                //if(0) //quarry1-102 | quarry2 - 132 (start-450 stop-269) | quarry3-240 | mun loop - 545
+
+                //4. Begin - Fusion CSV writing
+                if(updateGlobalPathCount >= 280) //bell412_dataset1 - 149|bell412_dataset5 - 136 fusion| dataset3 - 150 | dataset4 - 155
+                //if(0) //quarry1-102 | quarry2 - 132 (start-450 stop-269) | quarry3-240
                 {
                     int GTframeCountFull = 0;
                     //std::ofstream foutG("Fusion_LH.txt", std::ios::app);
-                    std::ofstream foutG("Fusion_bell412_dataset1_ppk.txt", std::ios::app);
+                    std::ofstream foutG("Fusion_bell412_dataset6_ppk.txt", std::ios::app);
                     for(iterFull_gOdom = globalPoseMap.begin(); iterFull_gOdom != globalPoseMap.end(); iterFull_gOdom++)
                     {
                         //read map
@@ -592,6 +572,7 @@ void GlobalOptimization::updateGlobalPath()
                             << globalPAll.z()  << std::endl;
                     }
                 }
+                //4. End - Fusion CSV writing
                 
 
     		}

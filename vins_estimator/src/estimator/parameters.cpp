@@ -34,6 +34,10 @@ int ROW, COL;
 double TD;
 int NUM_OF_CAM;
 int STEREO;
+int SEG;       // segmentation flag
+int DET;
+std::vector<uchar> seg_classes = {GRASS};   // segmentation classes, need to edit size in .h too
+std::vector<uchar> det_classes= {CAR,BUS,PERSON,TRUCK};
 int USE_IMU;
 int MULTIPLE_THREAD;
 map<int, Eigen::Vector3d> pts_gt;
@@ -81,6 +85,10 @@ void readParameters(std::string config_file)
 
     fsSettings["image0_topic"] >> IMAGE0_TOPIC;
     fsSettings["image1_topic"] >> IMAGE1_TOPIC;
+    SEG = fsSettings["seg"];            // extract segmentation parameter from settings file
+    DET = fsSettings["det"];            // extract detect ionparameter from settings file
+    printf("DET: %d\n",DET);
+    printf("SEG: %d\n",SEG);
     MAX_CNT = fsSettings["max_cnt"];
     MIN_DIST = fsSettings["min_dist"];
     F_THRESHOLD = fsSettings["F_threshold"];

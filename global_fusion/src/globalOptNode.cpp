@@ -43,9 +43,9 @@ map<double, vector<double>> GPSPositionMap;
 double last_vio_t = -1;
 std::queue<sensor_msgs::NavSatFixConstPtr> gpsQueue;
 std::mutex m_buf;
-bool rtk_unreliable = true;  //TODO  : send to config file
-bool use_ppk = true;  //TODO  : send to config file
-std::string ppk_pos_file = "/media/salah/OS/bell412_dataset5/bell412_dataset5_ppk.pos"; //TODO  : send to config file
+bool rtk_unreliable = false;  //TODO  : send to config file
+bool use_ppk = false;  //TODO  : send to config file
+std::string ppk_pos_file = "/media/salah/8ADC39F3DC39D9E1/bell412_dataset6/bell412_dataset6_frl.pos"; //TODO  : send to config file
 std::string nmeaSentence = {};
 std::string nmea_time;
 boost::posix_time::time_duration nmea_time_pval;
@@ -65,7 +65,7 @@ void publish_car_model(double t, Eigen::Vector3d t_w_car, Eigen::Quaterniond q_w
     visualization_msgs::MarkerArray markerArray_msg;
     visualization_msgs::Marker car_mesh;
     car_mesh.header.stamp = ros::Time(t);
-    car_mesh.header.frame_id = "worldGPS";
+    car_mesh.header.frame_id = "worldGPS"; //"worldGPS"
     car_mesh.type = visualization_msgs::Marker::MESH_RESOURCE;
     car_mesh.action = visualization_msgs::Marker::ADD;
     car_mesh.id = 0;

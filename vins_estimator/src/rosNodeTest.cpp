@@ -27,6 +27,8 @@ queue<sensor_msgs::ImuConstPtr> imu_buf;
 queue<sensor_msgs::PointCloudConstPtr> feature_buf;
 queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
+queue<sensor_msgs::ImageConstPtr> seg_buf;
+queue<sensor_msgs::ImageConstPtr> det_buf;
 std::mutex m_buf;
 
 
@@ -41,6 +43,24 @@ void img1_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
     m_buf.lock();
     img1_buf.push(img_msg);
+    m_buf.unlock();
+}
+
+// Segmentation callback
+void seg_callback(const sensor_msgs::ImageConstPtr &img_msg)
+{
+    m_buf.lock();
+    seg_buf.push(img_msg);
+    ROS_INFO("seg callback successful");
+    m_buf.unlock();
+}
+
+// Detection callback
+void det_callback(const sensor_msgs::ImageConstPtr &img_msg)
+{
+    m_buf.lock();
+    det_buf.push(img_msg);
+    //ROS_INFO("det callback successful");
     m_buf.unlock();
 }
 
@@ -110,18 +130,46 @@ void sync_process()
         }
         else
         {
-            cv::Mat image;
+            cv::Mat image,seg_im,det_im;
             std_msgs::Header header;
             double time = 0;
             m_buf.lock();
+            // check if the segmentation buffer is filled instead of the image buffer
             if(!img0_buf.empty())
             {
                 time = img0_buf.front()->header.stamp.toSec();
                 header = img0_buf.front()->header;
                 image = getImageFromMsg(img0_buf.front());
                 img0_buf.pop();
+                if (SEG)
+                {
+                    if(!seg_buf.empty())
+                    {
+                        seg_im = getImageFromMsg(seg_buf.front());
+                        seg_buf.pop();
+                    }
+                }
+                if (DET)
+                {
+                    if(!det_buf.empty())
+                    {
+                        det_im = getImageFromMsg(det_buf.front());
+                        det_buf.pop();
+                    }
+                }
             }
             m_buf.unlock();
+            if (SEG)
+            {
+                if(!seg_im.empty())
+                    estimator.seg_img = seg_im; 
+            }
+            if (DET)
+            {
+                if(!det_im.empty())
+                    estimator.det_img = det_im; 
+            }
+                
             if(!image.empty())
                 estimator.inputImage(time, image);
         }
@@ -257,6 +305,16 @@ int main(int argc, char **argv)
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
     ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
     ros::Subscriber sub_img1;
+    ros::Subscriber sub_seg;
+    ros::Subscriber sub_det;
+    if(SEG)
+    {
+        sub_seg = n.subscribe("/semantic", 100, seg_callback);      // segmentation subscriber
+    }
+    if(DET)
+    {
+        sub_det = n.subscribe("/detect", 100, det_callback);      // detection subscriber
+    }
     if(STEREO)
     {
         sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);

@@ -9,15 +9,10 @@ imu_topic: "/imu/data"
 image0_topic: "/camera/image_mono"
 output_path: "~/output/"
 
-cam0_calib: "payload_cam_down_NRC1.yaml"
+cam0_calib: "test_payload_cam.yaml"
+#cam0_calib: "test_payload_cam1.yaml"
 image_width: 1440
 image_height: 1080
-
-#Lidar info   
-use_lidar: 0
-point_cloud_topic: "/velodyne_points" #/scan default
-use_dense_cloud: 1  # if 0 uses the current scan only for depth enhancement
-lidar_skip: 3
    
 
 # Extrinsic parameter between IMU and Camera.
@@ -28,11 +23,10 @@ body_T_cam0: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [-0.01039363,   0.99994595,  0.00027614, -0.27939175,
-           -0.99982944, -0.0103882,  -0.01527021, 0.00394073,
-           -0.01526652,  -0.00043481, 0.99988337, -0.00039529,
+   data: [-0.0009792,   0.00685726,  0.99997601, 0.18648448,
+           0.99931723, -0.03692628,  0.00123178, -0.04199414,
+           0.03693384,  0.99929446, -0.00681642, -0.03693199,
            0, 0, 0, 1]
-
 
 #Multiple thread support
 multiple_thread: 1
@@ -62,8 +56,7 @@ g_norm: 9.803     # gravity magnitude
 
 #unsynchronization parameters
 estimate_td: 0                      # online estimate time offset between camera and imu
-td: -0.0297405129318                        # initial value of time offset. unit s. readed image clock + td = real image clock (IMU clock)
-# -0.02932 for the un sync data...., +0.006 for synced data (i.e., 6ms capture delay from hardware trigger)
+td: -0.02932                        # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
 
 #loop closure parameters
 load_previous_pose_graph: 0        # load and reuse previous pose graph; load from 'pose_graph_save_path'
@@ -71,5 +64,5 @@ pose_graph_save_path: "/storage_ssd/pose_graph/" # save and load path
 save_image: 1                   # save image in pose graph for visualization prupose; you can close this function by setting 0 
 
 #segmentation parameter
-seg: 1
-det: 0
+seg: 0
+det: 1
