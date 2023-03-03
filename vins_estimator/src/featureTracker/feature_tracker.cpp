@@ -258,17 +258,20 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             ids.push_back(n_id++);
             track_cnt.push_back(1);
         }
-        if(SEG && seg_reject_flag.size() != cur_pts.size())
+        if (SEG || DET)
         {
-            //ROS_INFO("fill up");
-            seg_reject_flag.resize(cur_pts.size());
-            fill(seg_reject_flag.begin(),seg_reject_flag.end(),0);
-        }
-        if(DET && det_reject_flag.size() != cur_pts.size())
-        {
-            //ROS_INFO("fill up");
-            det_reject_flag.resize(cur_pts.size());
-            fill(det_reject_flag.begin(),det_reject_flag.end(),0);
+            if(seg_reject_flag.size() != cur_pts.size())
+            {
+                //ROS_INFO("fill up");
+                seg_reject_flag.resize(cur_pts.size());
+                fill(seg_reject_flag.begin(),seg_reject_flag.end(),0);
+            }
+            if(det_reject_flag.size() != cur_pts.size())
+            {
+                //ROS_INFO("fill up");
+                det_reject_flag.resize(cur_pts.size());
+                fill(det_reject_flag.begin(),det_reject_flag.end(),0);
+            }
         }
         // printf("feature cnt after add %d\n", (int)ids.size());
     }
@@ -414,8 +417,10 @@ void FeatureTracker::rejectWithF()
         reduceVector(ids, status);
         reduceVector(track_cnt, status);
         if (SEG || DET)
+        {
             reduceVector(seg_reject_flag, status);
             reduceVector(det_reject_flag, status);
+        }
         ROS_DEBUG("FM ransac: %d -> %lu: %f", size_a, cur_pts.size(), 1.0 * cur_pts.size() / size_a);
         ROS_DEBUG("FM ransac costs: %fms", t_f.toc());
     }
@@ -577,7 +582,7 @@ void FeatureTracker::drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight,
 
     for (size_t j = 0; j < curLeftPts.size(); j++)
     {
-        if((SEG||DET) && (seg_reject_flag[j] || det_reject_flag[j])
+        if((SEG||DET) && (seg_reject_flag[j] || det_reject_flag[j]))
         {
             cv::circle(imTrack, curLeftPts[j], 2, cv::Scalar(255, 0, 255), 2);
         }
