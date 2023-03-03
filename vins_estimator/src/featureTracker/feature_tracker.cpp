@@ -45,12 +45,24 @@ void reduceVector(vector<int> &v, vector<uchar> status)
     v.resize(j);
 }
 
+void reduceVector(vector<uchar> &v, vector<uchar> status)
+{
+    int j = 0;
+    for (int i = 0; i < int(v.size()); i++)
+        if (status[i])
+            v[j++] = v[i];
+    v.resize(j);
+}
+
 FeatureTracker::FeatureTracker()
 {
     stereo_cam = 0;
     n_id = 0;
     hasPrediction = false;
+    seg_reject_flag.clear();
+    det_reject_flag.clear();
 }
+
 
 void FeatureTracker::setMask()
 {
@@ -77,6 +89,39 @@ void FeatureTracker::setMask()
             ids.push_back(it.second.second);
             track_cnt.push_back(it.first);
             cv::circle(mask, it.second.first, MIN_DIST, 0, -1);
+        }
+    }
+}
+
+
+void FeatureTracker::setMaskMod()
+{
+    mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));
+
+    // prefer to keep features that are tracked for long time
+    vector<pair<pair<int, pair<cv::Point2f, int>>, pair<uchar,uchar>>> cnt_pts_id;
+    for (unsigned int i = 0; i < cur_pts.size(); i++)
+        cnt_pts_id.push_back(make_pair(make_pair(track_cnt[i], make_pair(cur_pts[i], ids[i])), make_pair(seg_reject_flag[i],det_reject_flag[i])));
+
+    sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<pair<int, pair<cv::Point2f, int>>, pair<uchar,uchar>> &a, const pair<pair<int, pair<cv::Point2f, int>>, pair<uchar,uchar>> &b)
+         { return a.first.first > b.first.first; });
+
+    cur_pts.clear();
+    ids.clear();
+    track_cnt.clear();
+    seg_reject_flag.clear();
+    det_reject_flag.clear();
+
+    for (auto &it : cnt_pts_id)
+    {
+        if (mask.at<uchar>(it.first.second.first) == 255)
+        {
+            cur_pts.push_back(it.first.second.first);
+            ids.push_back(it.first.second.second);
+            track_cnt.push_back(it.first.first);
+            seg_reject_flag.push_back(it.second.first);
+            det_reject_flag.push_back(it.second.second);
+            cv::circle(mask, it.first.second.first, MIN_DIST, 0, -1);
         }
     }
 }
@@ -109,6 +154,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
 
     if (prev_pts.size() > 0)
     {
+        //ROS_INFO("prev_pts");
         TicToc t_o;
         vector<uchar> status;
         vector<float> err;
@@ -155,6 +201,12 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         reduceVector(cur_pts, status);
         reduceVector(ids, status);
         reduceVector(track_cnt, status);
+        //ROS_INFO("Reduce");
+        if(SEG || DET)
+        {
+            reduceVector(seg_reject_flag, status);
+            reduceVector(det_reject_flag, status);
+        }
         ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
         // printf("track cnt %d\n", (int)ids.size());
     }
@@ -165,11 +217,13 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     if (1)
     {
         // rejectWithF();
-
-
         ROS_DEBUG("set mask begins");
         TicToc t_m;
-        setMask();
+        //ROS_INFO("Set mask");
+        if (SEG || DET)
+            setMaskMod();
+        else
+            setMask();
         ROS_DEBUG("set mask costs %fms", t_m.toc());
 
         ROS_DEBUG("detect feature begins");
@@ -186,6 +240,17 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         else
             n_pts.clear();
         ROS_DEBUG("detect feature costs: %f ms", t_t.toc());
+        //  segmentation implementation
+        //ROS_INFO("Reject Mask");
+        if (SEG && !seg_img.empty())
+        {
+            reject_mask(seg_img,seg_classes,seg_reject_flag);
+        }
+        //  detection implementation
+        if (DET && !det_img.empty())
+        {
+            reject_mask(det_img,det_classes,det_reject_flag);
+        }
 
         for (auto &p : n_pts)
         {
@@ -193,16 +258,17 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             ids.push_back(n_id++);
             track_cnt.push_back(1);
         }
-
-        //  segmentation implementation
-        if (SEG && !seg_img.empty())
+        if(SEG && seg_reject_flag.size() != cur_pts.size())
         {
-            reject_mask(seg_img,seg_classes);
+            //ROS_INFO("fill up");
+            seg_reject_flag.resize(cur_pts.size());
+            fill(seg_reject_flag.begin(),seg_reject_flag.end(),0);
         }
-        //  detection implementation
-        if (DET && !det_img.empty())
+        if(DET && det_reject_flag.size() != cur_pts.size())
         {
-            reject_mask(det_img,det_classes);
+            //ROS_INFO("fill up");
+            det_reject_flag.resize(cur_pts.size());
+            fill(det_reject_flag.begin(),det_reject_flag.end(),0);
         }
         // printf("feature cnt after add %d\n", (int)ids.size());
     }
@@ -254,6 +320,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         }
         prev_un_right_pts_map = cur_un_right_pts_map;
     }
+    //ROS_INFO("reject_flag: %d, cur_pts: %d", reject_flag.size(),cur_pts.size());
+    //ROS_INFO("Draw Track");
     if (SHOW_TRACK)
         drawTrack(cur_img, rightImg, ids, cur_pts, cur_right_pts, prevLeftPtsMap);
 
@@ -345,36 +413,51 @@ void FeatureTracker::rejectWithF()
         reduceVector(cur_un_pts, status);
         reduceVector(ids, status);
         reduceVector(track_cnt, status);
+        if (SEG || DET)
+            reduceVector(seg_reject_flag, status);
+            reduceVector(det_reject_flag, status);
         ROS_DEBUG("FM ransac: %d -> %lu: %f", size_a, cur_pts.size(), 1.0 * cur_pts.size() / size_a);
         ROS_DEBUG("FM ransac costs: %fms", t_f.toc());
     }
 }
 
 // Segmentation & Detection method
-void FeatureTracker::reject_mask(const cv::Mat _img,const vector<uchar> classes)
+void FeatureTracker::reject_mask(const cv::Mat _img, const vector<uchar> classes, vector<uchar>& reject_flag)
 {
     uchar val,flag;
-    vector<uchar> status;
+    //reject_flag.clear();
+    // old points
     for (int i = 0; i < int(cur_pts.size()); i++)
     {
-        flag = 1;
-        //printf("current point: %f,%f\n",cur_pts[i].y,cur_pts[i].x);
-        for (auto it : classes)
+        if (reject_flag[i] == 0)
         {
             val = _img.at<uchar>(cur_pts[i]);
+            for (auto it : classes)
+            {
+                if (val == it)
+                {
+                    reject_flag[i] = 1;
+                    break;
+                }
+            }
+        }
+    }
+    // new points
+    for (int i = 0; i < int(n_pts.size()); i++)
+    {
+        flag = 0;
+        //printf("current point: %f,%f\n",cur_pts[i].y,cur_pts[i].x);
+        val = _img.at<uchar>(n_pts[i]);
+        for (auto it : classes)
+        {
             if (val == it)
             {
-                flag = 0;
+                flag = 1;
                 break;
             }
         }
-        status.push_back(flag);
+        reject_flag.push_back(flag);
     }
-    reduceVector(prev_pts, status);
-    reduceVector(cur_pts, status);
-    reduceVector(cur_un_pts, status);
-    reduceVector(ids, status);
-    reduceVector(track_cnt, status);
 }
 
 void FeatureTracker::readIntrinsicParameter(const vector<string> &calib_file)
@@ -494,8 +577,15 @@ void FeatureTracker::drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight,
 
     for (size_t j = 0; j < curLeftPts.size(); j++)
     {
+        if((SEG||DET) && (seg_reject_flag[j] || det_reject_flag[j])
+        {
+            cv::circle(imTrack, curLeftPts[j], 2, cv::Scalar(255, 0, 255), 2);
+        }
+        else
+        {
         double len = std::min(1.0, 1.0 * track_cnt[j] / 20);
         cv::circle(imTrack, curLeftPts[j], 2, cv::Scalar(255 * (1 - len), 0, 255 * len), 2);
+        }
     }
     if (!imRight.empty() && stereo_cam)
     {
@@ -572,6 +662,8 @@ void FeatureTracker::removeOutliers(set<int> &removePtsIds)
     reduceVector(prev_pts, status);
     reduceVector(ids, status);
     reduceVector(track_cnt, status);
+    reduceVector(seg_reject_flag, status);
+    reduceVector(det_reject_flag, status);
 }
 
 cv::Mat FeatureTracker::getTrackImage()

@@ -39,6 +39,7 @@ public:
     FeatureTracker();
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void setMask();
+    void setMaskMod();
     void readIntrinsicParameter(const vector<string> &calib_file);
     void showUndistortion(const string &name);
     void rejectWithF();
@@ -75,6 +76,7 @@ public:
     vector<cv::Point2f> pts_velocity, right_pts_velocity;
     vector<int> ids, ids_right;
     vector<int> track_cnt;
+    vector<uchar> seg_reject_flag, det_reject_flag;
     map<int, cv::Point2f> cur_un_pts_map, prev_un_pts_map;
     map<int, cv::Point2f> cur_un_right_pts_map, prev_un_right_pts_map;
     map<int, cv::Point2f> prevLeftPtsMap;
