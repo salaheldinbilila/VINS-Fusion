@@ -335,13 +335,26 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     prev_time = cur_time;
     hasPrediction = false;
 
+    // Good idea to reutilize for flags
     prevLeftPtsMap.clear();
     for (size_t i = 0; i < cur_pts.size(); i++)
         prevLeftPtsMap[ids[i]] = cur_pts[i];
 
+    vector<uchar> reduce_flag(cur_pts.size(),0);
+    if (SEG || DET)
+    {
+        for (size_t i = 0; i < reduce_flag.size(); i++)
+        {
+            reduce_flag[i] = (SEG && seg_reject_flag[i]) || (DET && det_reject_flag[i]);
+        }
+        //ROS_INFO("flags matching: %d",(reduce_flag == seg_reject_flag) || (reduce_flag == det_reject_flag));
+    }
+
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
     for (size_t i = 0; i < ids.size(); i++)
     {
+        if(reduce_flag[i])
+            continue;
         int feature_id = ids[i];
         double x, y, z;
         x = cur_un_pts[i].x;
@@ -384,6 +397,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     }
 
     // printf("feature track whole time %f\n", t_r.toc());
+    ROS_INFO("initial features: %d, after reduction: %d",ids.size(),featureFrame.size());
     return featureFrame;
 }
 
@@ -584,7 +598,7 @@ void FeatureTracker::drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight,
     {
         if((SEG||DET) && (seg_reject_flag[j] || det_reject_flag[j]))
         {
-            cv::circle(imTrack, curLeftPts[j], 2, cv::Scalar(255, 0, 255), 2);
+            cv::circle(imTrack, curLeftPts[j], 5, cv::Scalar(0, 255, 255), 5);
         }
         else
         {
