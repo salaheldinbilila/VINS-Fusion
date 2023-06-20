@@ -21,6 +21,8 @@
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
 
+#define time_out_count 10
+
 Estimator estimator;
 
 queue<sensor_msgs::ImuConstPtr> imu_buf;
@@ -51,7 +53,7 @@ void seg_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
     m_buf.lock();
     seg_buf.push(img_msg);
-    ROS_INFO("seg callback successful");
+    //ROS_INFO("seg callback successful");
     m_buf.unlock();
 }
 
@@ -131,47 +133,123 @@ void sync_process()
         else
         {
             cv::Mat image,seg_im,det_im;
-            std_msgs::Header header;
-            double time = 0;
+            std_msgs::Header header,seg_header,det_header;
+            double time = 0 ,seg_time = 0 ,det_time = 0;
+            static char empty_count = 0;
             m_buf.lock();
             // check if the segmentation buffer is filled instead of the image buffer
             if(!img0_buf.empty())
             {
-                time = img0_buf.front()->header.stamp.toSec();
-                header = img0_buf.front()->header;
-                image = getImageFromMsg(img0_buf.front());
-                img0_buf.pop();
                 if (SEG)
                 {
                     if(!seg_buf.empty())
                     {
-                        seg_im = getImageFromMsg(seg_buf.front());
-                        seg_buf.pop();
+                        time = img0_buf.front()->header.stamp.toSec();
+                        header = img0_buf.front()->header;
+                        ROS_INFO("Image header: %f",time);
+                        seg_time = seg_buf.front()->header.stamp.toSec();
+                        seg_header = seg_buf.front()->header;
+                        ROS_INFO("segmentation time: %f",seg_time);
+                        ROS_INFO("segmentation time diff: %f",seg_time-time);
+                        if (seg_time < time)
+                        {
+                            ROS_INFO("The segmentation is of an old image");
+                            seg_buf.pop();
+                        }
+                        else if (seg_time > time)
+                        {
+                            ROS_INFO("The image is not segmented, discard");
+                            img0_buf.pop();
+                        }
+                        else if (seg_time == time)
+                        {
+                            ROS_INFO("Images match");
+                            image = getImageFromMsg(img0_buf.front());
+                            img0_buf.pop();
+                            seg_im = getImageFromMsg(seg_buf.front());
+                            seg_buf.pop();
+                        }
                     }
                 }
-                if (DET)
+                else if (DET)
                 {
                     if(!det_buf.empty())
                     {
-                        det_im = getImageFromMsg(det_buf.front());
-                        det_buf.pop();
+                        empty_count = 0;
+                        time = img0_buf.front()->header.stamp.toSec();
+                        header = img0_buf.front()->header;
+                        ROS_INFO("Image header: %f",time);
+                        det_time = det_buf.front()->header.stamp.toSec();
+                        det_header = det_buf.front()->header;
+                        ROS_INFO("detection time: %f",det_time);
+                        ROS_INFO("detection time diff: %f",det_time-time);
+                        if (det_time < time)
+                        {
+                            ROS_INFO("The detection is of an old image, discard");
+                            det_buf.pop();
+                        }
+                        else if (det_time > time)
+                        {
+                            ROS_INFO("Image too late. Use image without detection");
+                            image = getImageFromMsg(img0_buf.front());
+                            img0_buf.pop();
+                        }
+                        else //(det_time == time)
+                        {
+                            ROS_INFO("Images match, process both");
+                            image = getImageFromMsg(img0_buf.front());
+                            img0_buf.pop();
+                            estimator.det_img = getImageFromMsg(det_buf.front());
+                            det_buf.pop();
+                        }
                     }
+                    else
+                    {
+                        time = img0_buf.front()->header.stamp.toSec();
+                        header = img0_buf.front()->header;
+                        ROS_INFO("Image header: %f",time);
+                        empty_count++;
+                        ROS_INFO("Detection buffer empty, count: %d",empty_count);
+                        if (empty_count == time_out_count)
+                        {
+                            empty_count = 0;
+                            ROS_INFO("Buffer still empty. Use image without detection");
+                            image = getImageFromMsg(img0_buf.front());
+                            img0_buf.pop();
+                        }
+                    }
+                }
+                else
+                {
+                    time = img0_buf.front()->header.stamp.toSec();
+                    header = img0_buf.front()->header;
+                    ROS_INFO("Image header: %f",time);
+                    image = getImageFromMsg(img0_buf.front());
+                    img0_buf.pop();
                 }
             }
             m_buf.unlock();
             if (SEG)
             {
                 if(!seg_im.empty())
-                    estimator.seg_img = seg_im; 
+                {
+                    estimator.seg_img = seg_im;
+                    //seg_im.release();
+                } 
             }
-            if (DET)
+            /*
+            else if (DET)
             {
                 if(!det_im.empty())
-                    estimator.det_img = det_im; 
+                {
+                    estimator.det_img = det_im;
+                }
             }
-                
+            */
             if(!image.empty())
+            {
                 estimator.inputImage(time, image);
+            }
         }
 
         std::chrono::milliseconds dura(2);

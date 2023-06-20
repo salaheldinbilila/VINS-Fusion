@@ -598,7 +598,7 @@ void FeatureTracker::drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight,
     {
         if((SEG||DET) && (seg_reject_flag[j] || det_reject_flag[j]))
         {
-            cv::circle(imTrack, curLeftPts[j], 5, cv::Scalar(0, 255, 255), 5);
+            cv::circle(imTrack, curLeftPts[j], 5, cv::Scalar(0, 255, 0), 5);
         }
         else
         {
