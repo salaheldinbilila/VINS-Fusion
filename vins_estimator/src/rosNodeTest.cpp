@@ -366,6 +366,8 @@ int main(int argc, char **argv)
 
     readParameters(config_file);
     estimator.setParameter();
+    estimator.featureTracker.car_mask = cv::imread(CAR_MASK, 0);
+    estimator.featureTracker.bus_mask = cv::imread(BUS_MASK, 0);
 
 #ifdef EIGEN_DONT_PARALLELIZE
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");

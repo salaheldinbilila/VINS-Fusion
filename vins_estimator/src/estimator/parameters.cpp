@@ -42,7 +42,7 @@ int USE_IMU;
 int MULTIPLE_THREAD;
 map<int, Eigen::Vector3d> pts_gt;
 std::string IMAGE0_TOPIC, IMAGE1_TOPIC;
-std::string FISHEYE_MASK;
+std::string FISHEYE_MASK,CAR_MASK,BUS_MASK;
 std::vector<std::string> CAM_NAMES;
 int MAX_CNT;
 int MIN_DIST;
@@ -181,6 +181,12 @@ void readParameters(std::string config_file)
         RIC.push_back(T.block<3, 3>(0, 0));
         TIC.push_back(T.block<3, 1>(0, 3));
     }
+
+    std::string car_mask_file,bus_mask_file;
+    fsSettings["bus_mask"] >> bus_mask_file;
+    fsSettings["car_mask"] >> car_mask_file;
+    BUS_MASK = configPath + "/" + bus_mask_file;
+    CAR_MASK = configPath + "/" + car_mask_file;
 
     INIT_DEPTH = 5.0;
     BIAS_ACC_THRESHOLD = 0.1;

@@ -66,8 +66,8 @@ public:
     cv::Mat mask;
     cv::Mat fisheye_mask;
     cv::Mat prev_img, cur_img;
-    cv::Mat seg_img;     // segmentation image passing
-    cv::Mat det_img;     // segmentation image passing
+    cv::Mat seg_img, det_img;     // segmentation & detection image passing
+    cv::Mat car_mask, bus_mask;     // masks
     vector<cv::Point2f> n_pts;
     vector<cv::Point2f> predict_pts;
     vector<cv::Point2f> predict_pts_debug;

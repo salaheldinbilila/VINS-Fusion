@@ -66,3 +66,7 @@ save_image: 1                   # save image in pose graph for visualization pru
 #segmentation parameter
 seg: 0
 det: 1
+
+#masks in config folder of the same config file
+car_mask: "car_mask.jpg"
+bus_mask: "bus_mask.jpg"

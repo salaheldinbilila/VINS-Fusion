@@ -66,7 +66,8 @@ FeatureTracker::FeatureTracker()
 
 void FeatureTracker::setMask()
 {
-    mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));
+    //mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));
+    mask = car_mask.clone();
 
     // prefer to keep features that are tracked for long time
     vector<pair<int, pair<cv::Point2f, int>>> cnt_pts_id;
@@ -96,7 +97,8 @@ void FeatureTracker::setMask()
 
 void FeatureTracker::setMaskMod()
 {
-    mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));
+    //mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));
+    mask = car_mask.clone();
 
     // prefer to keep features that are tracked for long time
     vector<pair<pair<int, pair<cv::Point2f, int>>, pair<uchar,uchar>>> cnt_pts_id;
