@@ -464,7 +464,7 @@ void GlobalOptimization::updateGlobalPath()
     //full frame count iter
 
     // time sequence check-k  
-    //double time_first = iter->first;
+    double time_first = iter->first;
     for(int j = 0;j < GTframeCount; j++, iter++, iter2++){ // go to the current frame
     }
     std::ofstream foutC("resultsOdom.txt", std::ios::app);  
@@ -540,7 +540,8 @@ void GlobalOptimization::updateGlobalPath()
 				    << globalR(2,0) << " "
 				    << globalR(2,1) << " "
 				    << globalR(2,2) << " "
-				    << globalP.z()  << std::endl;
+				    << globalP.z()  << " "
+                    << iter->first-time_first << std::endl;
 
                 //write the whole map to a new file
                 if(printOnceInTerminal){
@@ -643,7 +644,8 @@ void GlobalOptimization::updateGlobalPath()
 				    << gtR(2,0) << " "
 				    << gtR(2,1) << " "
 				    << gtR(2,2) << " "
-				    << gtP.z()  << std::endl;
+				    << gtP.z()  << " "
+                    << iter2->first-time_first << std::endl;
     		}
     }
      // time sequence check -k

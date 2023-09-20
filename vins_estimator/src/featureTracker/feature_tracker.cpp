@@ -61,13 +61,25 @@ FeatureTracker::FeatureTracker()
     hasPrediction = false;
     seg_reject_flag.clear();
     det_reject_flag.clear();
+    /*
+    if (SEG)
+    {
+        seg_reject_flag.resize(MAX_CNT);
+        fill(seg_reject_flag.begin(),seg_reject_flag.end(),0);
+    }
+    if (DET)
+    {
+        seg_reject_flag.resize(MAX_CNT);
+        fill(seg_reject_flag.begin(),seg_reject_flag.end(),0);
+    }
+    */
 }
 
 
 void FeatureTracker::setMask()
 {
-    //mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));
-    mask = car_mask.clone();
+    mask = cv::Mat(row, col, CV_8UC1, cv::Scalar(255));
+    //mask = car_mask.clone();
 
     // prefer to keep features that are tracked for long time
     vector<pair<int, pair<cv::Point2f, int>>> cnt_pts_id;
@@ -153,6 +165,22 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     }
     */
     cur_pts.clear();
+
+    /*
+    if (cur_time >= 1642447431 && cur_time < 1642447441)
+    {
+        ROS_INFO("Bus is here!");
+        if (!clear_first_time)
+        {
+            ROS_INFO("Clearing prev pts");
+            prev_pts.clear();
+            clear_first_time = true;
+        }
+        bus = true;
+    }
+    else
+        bus = false;
+    */
 
     if (prev_pts.size() > 0)
     {

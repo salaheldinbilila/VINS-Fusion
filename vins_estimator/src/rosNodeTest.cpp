@@ -21,7 +21,7 @@
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
 
-#define time_out_count 10
+#define time_out_count 25
 
 Estimator estimator;
 
@@ -140,13 +140,13 @@ void sync_process()
             // check if the segmentation buffer is filled instead of the image buffer
             if(!img0_buf.empty())
             {
+                time = img0_buf.front()->header.stamp.toSec();
+                header = img0_buf.front()->header;
+                ROS_INFO("Image header: %f",time);
                 if (SEG)
                 {
                     if(!seg_buf.empty())
                     {
-                        time = img0_buf.front()->header.stamp.toSec();
-                        header = img0_buf.front()->header;
-                        ROS_INFO("Image header: %f",time);
                         seg_time = seg_buf.front()->header.stamp.toSec();
                         seg_header = seg_buf.front()->header;
                         ROS_INFO("segmentation time: %f",seg_time);
@@ -176,11 +176,7 @@ void sync_process()
                     if(!det_buf.empty())
                     {
                         empty_count = 0;
-                        time = img0_buf.front()->header.stamp.toSec();
-                        header = img0_buf.front()->header;
-                        ROS_INFO("Image header: %f",time);
                         det_time = det_buf.front()->header.stamp.toSec();
-                        det_header = det_buf.front()->header;
                         ROS_INFO("detection time: %f",det_time);
                         ROS_INFO("detection time diff: %f",det_time-time);
                         if (det_time < time)
@@ -199,15 +195,12 @@ void sync_process()
                             ROS_INFO("Images match, process both");
                             image = getImageFromMsg(img0_buf.front());
                             img0_buf.pop();
-                            estimator.det_img = getImageFromMsg(det_buf.front());
+                            estimator.featureTracker.det_img = getImageFromMsg(det_buf.front());
                             det_buf.pop();
                         }
                     }
                     else
                     {
-                        time = img0_buf.front()->header.stamp.toSec();
-                        header = img0_buf.front()->header;
-                        ROS_INFO("Image header: %f",time);
                         empty_count++;
                         ROS_INFO("Detection buffer empty, count: %d",empty_count);
                         if (empty_count == time_out_count)
@@ -221,9 +214,6 @@ void sync_process()
                 }
                 else
                 {
-                    time = img0_buf.front()->header.stamp.toSec();
-                    header = img0_buf.front()->header;
-                    ROS_INFO("Image header: %f",time);
                     image = getImageFromMsg(img0_buf.front());
                     img0_buf.pop();
                 }
@@ -233,7 +223,7 @@ void sync_process()
             {
                 if(!seg_im.empty())
                 {
-                    estimator.seg_img = seg_im;
+                    estimator.featureTracker.seg_img = seg_im;
                     //seg_im.release();
                 } 
             }

@@ -162,8 +162,6 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
     inputImageCnt++;
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
     TicToc featureTrackerTime;
-    featureTracker.seg_img = seg_img;
-    featureTracker.det_img = det_img;
     if(_img1.empty())
         featureFrame = featureTracker.trackImage(t, _img);
     else

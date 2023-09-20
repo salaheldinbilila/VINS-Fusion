@@ -105,8 +105,6 @@ class Estimator
     std::thread processThread;
 
     FeatureTracker featureTracker;
-    cv::Mat seg_img;   // segmentation image passing
-    cv::Mat det_img;     // segmentation image passing
 
     SolverFlag solver_flag;
     MarginalizationFlag  marginalization_flag;

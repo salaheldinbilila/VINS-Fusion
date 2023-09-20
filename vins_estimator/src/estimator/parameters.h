@@ -58,17 +58,18 @@ extern int ROLLING_SHUTTER;
 extern int ROW, COL;
 extern int NUM_OF_CAM;
 extern int STEREO;
-extern int SEG;
-extern int DET;
-extern std::vector<uchar> seg_classes;
-extern std::vector<uchar> det_classes;
+extern int SEG;                             //segmentation flag
+extern int DET;                             //detection flag
+extern std::vector<uchar> seg_classes;      //segmentation classes
+extern std::vector<uchar> det_classes;      //detection classes
 extern int USE_IMU;
 extern int MULTIPLE_THREAD;
 // pts_gt for debug purpose;
 extern map<int, Eigen::Vector3d> pts_gt;
 
 extern std::string IMAGE0_TOPIC, IMAGE1_TOPIC;
-extern std::string FISHEYE_MASK,CAR_MASK,BUS_MASK;
+extern std::string FISHEYE_MASK;
+extern std::string CAR_MASK,BUS_MASK;       //car mask and bus mask file names
 extern std::vector<std::string> CAM_NAMES;
 extern int MAX_CNT;
 extern int MIN_DIST;
