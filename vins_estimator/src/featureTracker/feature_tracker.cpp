@@ -427,7 +427,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     }
 
     // printf("feature track whole time %f\n", t_r.toc());
-    ROS_INFO("initial features: %d, after reduction: %d",ids.size(),featureFrame.size());
+    // ROS_INFO("initial features: %d, after reduction: %d",ids.size(),featureFrame.size());
     return featureFrame;
 }
 

@@ -14,6 +14,7 @@ Estimator::Estimator(): f_manager{Rs}
 {
     ROS_INFO("init begins");
     initThreadFlag = false;
+    depth_cloud = boost::make_shared<pcl::PointCloud<PointType>>();
     clearState();
 }
 
@@ -173,7 +174,21 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
         cv::Mat imgTrack = featureTracker.getTrackImage();
         pubTrackImage(imgTrack, t);
     }
-    
+    // get time stamp in ros format
+    ros::Time stamp(t);
+    // get a vector of the features to get the depth of
+    vector<geometry_msgs::Point32> points;
+    // iterate over the feature frame
+    for (auto frame : featureFrame)
+    {
+        geometry_msgs::Point32 point;
+        point.x = frame.second[0].second(0);
+        point.y = frame.second[0].second(1);
+        point.z = frame.second[0].second(2);
+        points.push_back(point);
+    }
+    sensor_msgs::ChannelFloat32 depth_of_points = depthRegister->get_depth(stamp, _img, depth_cloud, featureTracker.m_camera[0], points);
+
     if(MULTIPLE_THREAD)  
     {     
         if(inputImageCnt % 2 == 0)

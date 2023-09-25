@@ -8,30 +8,53 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 
 find_package(catkin REQUIRED COMPONENTS
     roscpp
+    roslib
     std_msgs
     geometry_msgs
     nav_msgs
     tf
     cv_bridge
     camera_models
-    image_transport)
+    image_transport
+    pcl_conversions
+    message_generation
+)
 
 find_package(OpenCV REQUIRED)
 
 # message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
 find_package(Ceres REQUIRED)
+find_package(OpenMP REQUIRED)
+find_package(PCL REQUIRED)
+find_package(GTSAM REQUIRED QUIET)
+find_package(Boost REQUIRED COMPONENTS filesystem program_options system timer)
 
 include_directories(${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS})
-
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 find_package(Eigen3)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+  ${CERES_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
+  ${GTSAM_INCLUDE_DIR}
   ${EIGEN3_INCLUDE_DIR}
 )
 
-catkin_package()
+
+catkin_package(
+  DEPENDS PCL GTSAM
+)
+
+link_directories(
+    ${PCL_LIBRARY_DIRS}
+    ${OpenCV_LIBRARY_DIRS}
+    ${GTSAM_LIBRARY_DIRS}
+)
+
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
 
 add_library(vins_lib
     src/estimator/parameters.cpp
@@ -50,7 +73,7 @@ add_library(vins_lib
     src/initial/initial_sfm.cpp
     src/initial/initial_ex_rotation.cpp
     src/featureTracker/feature_tracker.cpp)
-target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES})
+target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ${PCL_LIBRARIES})
 
 
 add_executable(vins_node src/rosNodeTest.cpp)

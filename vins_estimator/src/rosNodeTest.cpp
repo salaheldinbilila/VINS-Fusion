@@ -31,7 +31,16 @@ queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
 queue<sensor_msgs::ImageConstPtr> seg_buf;
 queue<sensor_msgs::ImageConstPtr> det_buf;
+std::mutex mtx_lidar;
 std::mutex m_buf;
+
+// global variable for saving the depthCloud shared between two threads
+pcl::PointCloud<PointType>::Ptr depthCloud(new pcl::PointCloud<PointType>());
+pcl::PointCloud<PointType>::Ptr depthCloudLocal(new pcl::PointCloud<PointType>());
+
+// global variables saving the lidar point cloud
+deque<pcl::PointCloud<PointType>> cloudQueue;
+deque<double> timeQueue;
 
 
 void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
@@ -87,6 +96,102 @@ cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg)
 
     cv::Mat img = ptr->image.clone();
     return img;
+}
+
+void lidar_callback(const sensor_msgs::PointCloud2ConstPtr& laser_msg)
+{
+    static int lidar_count = -1;
+    if (++lidar_count % (LIDAR_SKIP+1) != 0)
+        return;
+
+    // 0. listen to transform
+    static tf::TransformListener listener;
+    static tf::StampedTransform transform;
+    try{
+        listener.waitForTransform("world", "body_ros", laser_msg->header.stamp, ros::Duration(0.01));
+        listener.lookupTransform("world", "body_ros", laser_msg->header.stamp, transform);
+    } 
+    catch (tf::TransformException ex){
+        // ROS_ERROR("lidar no tf");
+        return;
+    }
+
+    double xCur, yCur, zCur, rollCur, pitchCur, yawCur;
+    xCur = transform.getOrigin().x();
+    yCur = transform.getOrigin().y();
+    zCur = transform.getOrigin().z();
+    tf::Matrix3x3 m(transform.getRotation());
+    m.getRPY(rollCur, pitchCur, yawCur);
+    Eigen::Affine3f transNow = pcl::getTransformation(xCur, yCur, zCur, rollCur, pitchCur, yawCur);
+
+    // 1. convert laser cloud message to pcl
+    pcl::PointCloud<PointType>::Ptr laser_cloud_in(new pcl::PointCloud<PointType>());
+    pcl::fromROSMsg(*laser_msg, *laser_cloud_in);
+
+    // 2. downsample new cloud (save memory)
+    pcl::PointCloud<PointType>::Ptr laser_cloud_in_ds(new pcl::PointCloud<PointType>());
+    static pcl::VoxelGrid<PointType> downSizeFilter;
+    downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
+    downSizeFilter.setInputCloud(laser_cloud_in);
+    downSizeFilter.filter(*laser_cloud_in_ds);
+    *laser_cloud_in = *laser_cloud_in_ds;
+
+    // 3. filter lidar points (only keep points in camera view)
+    pcl::PointCloud<PointType>::Ptr laser_cloud_in_filter(new pcl::PointCloud<PointType>());
+    for (int i = 0; i < (int)laser_cloud_in->size(); ++i)
+    {
+        PointType p = laser_cloud_in->points[i];
+        if (p.x >= 0 && abs(p.y / p.x) <= 10 && abs(p.z / p.x) <= 10)
+            laser_cloud_in_filter->push_back(p);
+    }
+    *laser_cloud_in = *laser_cloud_in_filter;
+
+    // TODO: transform to IMU body frame
+    // 4. offset T_lidar -> T_camera 
+    pcl::PointCloud<PointType>::Ptr laser_cloud_offset(new pcl::PointCloud<PointType>());
+    Eigen::Affine3f transOffset = pcl::getTransformation(L_C_TX, L_C_TY, L_C_TZ, L_C_RX, L_C_RY, L_C_RZ);
+    pcl::transformPointCloud(*laser_cloud_in, *laser_cloud_offset, transOffset);
+    *laser_cloud_in = *laser_cloud_offset;
+
+    // 5. transform new cloud into global odom frame
+    pcl::PointCloud<PointType>::Ptr laser_cloud_global(new pcl::PointCloud<PointType>());
+    pcl::transformPointCloud(*laser_cloud_in, *laser_cloud_global, transNow);
+
+    // 6. save new cloud
+    double timeScanCur = laser_msg->header.stamp.toSec();
+    cloudQueue.push_back(*laser_cloud_global);
+    timeQueue.push_back(timeScanCur);
+    *depthCloudLocal = *laser_cloud_in;
+
+    // 7. pop old cloud
+    while (!timeQueue.empty())
+    {
+        if (timeScanCur - timeQueue.front() > 5.0)
+        {
+            cloudQueue.pop_front();
+            timeQueue.pop_front();
+        } else {
+            break;
+        }
+    }
+    
+    std::lock_guard<std::mutex> lock(mtx_lidar);
+    
+    // 8. fuse global cloud
+    depthCloud->clear();
+    if (USE_DENSE_CLOUD == 0){
+    	*depthCloud += cloudQueue.back();
+    }else {
+    	for (int i = 0; i < (int)cloudQueue.size(); ++i)
+        	*depthCloud += cloudQueue[i];
+    }
+
+    // 9. downsample global cloud
+    pcl::PointCloud<PointType>::Ptr depthCloudDS(new pcl::PointCloud<PointType>());
+    downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
+    downSizeFilter.setInputCloud(depthCloud);
+    downSizeFilter.filter(*depthCloudDS);
+    *depthCloud = *depthCloudDS;
 }
 
 // extract images with same timestamp from two topics
@@ -238,6 +343,9 @@ void sync_process()
             */
             if(!image.empty())
             {
+                mtx_lidar.lock();
+                *estimator.depth_cloud = *depthCloud;
+                mtx_lidar.unlock();
                 estimator.inputImage(time, image);
             }
         }
@@ -366,35 +474,34 @@ int main(int argc, char **argv)
     ROS_WARN("waiting for image and imu...");
 
     registerPub(n);
+    estimator.depthRegister = new DepthRegister(n);
 
     ros::Subscriber sub_imu;
     if(USE_IMU)
-    {
         sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
-    }
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
     ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
+    ros::Subscriber sub_lidar = n.subscribe(POINT_CLOUD_TOPIC, 100,    lidar_callback);
     ros::Subscriber sub_img1;
     ros::Subscriber sub_seg;
     ros::Subscriber sub_det;
     if(SEG)
-    {
         sub_seg = n.subscribe("/semantic", 100, seg_callback);      // segmentation subscriber
-    }
     if(DET)
-    {
         sub_det = n.subscribe("/detect", 100, det_callback);      // detection subscriber
-    }
     if(STEREO)
-    {
         sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
-    }
+    if (!USE_LIDAR)
+        sub_lidar.shutdown();
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);
     ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);
 
     std::thread sync_thread{sync_process};
-    ros::spin();
+    //ros::spin();
+    // four ROS spinners for parallel processing (segmentation, detection, image and lidar)
+    ros::MultiThreadedSpinner spinner(4);
+    spinner.spin();
 
     return 0;
 }

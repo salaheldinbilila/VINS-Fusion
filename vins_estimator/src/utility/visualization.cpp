@@ -12,6 +12,7 @@
 using namespace ros;
 using namespace Eigen;
 ros::Publisher pub_odometry, pub_latest_odometry;
+ros::Publisher pub_latest_odometry_ros;
 ros::Publisher pub_path;
 ros::Publisher pub_point_cloud, pub_margin_cloud;
 ros::Publisher pub_key_poses;
@@ -34,6 +35,7 @@ size_t pub_counter = 0;
 void registerPub(ros::NodeHandle &n)
 {
     pub_latest_odometry = n.advertise<nav_msgs::Odometry>("imu_propagate", 1000);
+    pub_latest_odometry_ros = n.advertise<nav_msgs::Odometry>("imu_propagate_ros", 1000);
     pub_path = n.advertise<nav_msgs::Path>("path", 1000);
     pub_odometry = n.advertise<nav_msgs::Odometry>("odometry", 1000);
     pub_point_cloud = n.advertise<sensor_msgs::PointCloud>("point_cloud", 1000);
@@ -48,6 +50,17 @@ void registerPub(ros::NodeHandle &n)
 
     cameraposevisual.setScale(0.1);
     cameraposevisual.setLineWidth(0.01);
+}
+
+tf::Transform transformConversion(const tf::StampedTransform& t)
+{
+    double xCur, yCur, zCur, rollCur, pitchCur, yawCur;
+    xCur = t.getOrigin().x();
+    yCur = t.getOrigin().y();
+    zCur = t.getOrigin().z();
+    tf::Matrix3x3 m(t.getRotation());
+    m.getRPY(rollCur, pitchCur, yawCur);
+    return tf::Transform(tf::createQuaternionFromRPY(rollCur, pitchCur, yawCur), tf::Vector3(xCur, yCur, zCur));;
 }
 
 void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, const Eigen::Vector3d &V, double t)
@@ -66,6 +79,74 @@ void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, co
     odometry.twist.twist.linear.y = V.y();
     odometry.twist.twist.linear.z = V.z();
     pub_latest_odometry.publish(odometry);
+
+    static double last_align_time = -1;
+    static tf::TransformBroadcaster br;
+    static tf::TransformListener listener;
+    
+    //Oscar - taking tCL and RCL from cfg files
+    //Get T_VW_VB : VW: vinsworld, VB: vins body(imu)
+    Eigen::Matrix4d Tmat_VW_VB;   
+    Tmat_VW_VB.setIdentity();
+    Tmat_VW_VB.block<3,3>(0,0) = Q.toRotationMatrix();
+    Tmat_VW_VB.block<3,1>(0,3) = P;
+
+    //Get T_I_L = T_I_C*T_C_L
+    Eigen::Matrix4d Tmat_IC;
+    Tmat_IC.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
+    Tmat_IC.block<3,3>(0,0) = RIC[0];
+    Tmat_IC.block<3,1>(0,3) = TIC[0];
+    
+    Eigen::Matrix4d Tmat_CL;
+    Tmat_CL.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
+    Tmat_CL.block<3,3>(0,0) = RCL[0];
+    Tmat_CL.block<3,1>(0,3) = TCL[0];
+
+    Eigen::Matrix4d Tmat_IL = Tmat_IC * Tmat_CL;
+   
+    //Find T_VW_LB = T_VW_VB*T_I_L
+    Eigen::Matrix4d Tmat_VW_LB = Tmat_VW_VB * Tmat_IL;   
+    
+    //publish Odometery
+    Eigen::Quaterniond tempQ(Tmat_VW_LB.block<3,3>(0,0));
+    
+    odometry.pose.pose.position.x = Tmat_VW_LB.matrix()(0,3);
+    odometry.pose.pose.position.y = Tmat_VW_LB.matrix()(1,3);
+    odometry.pose.pose.position.z = Tmat_VW_LB.matrix()(2,3);
+    odometry.pose.pose.orientation.x = tempQ.x();
+    odometry.pose.pose.orientation.y = tempQ.y();
+    odometry.pose.pose.orientation.z = tempQ.z();
+    odometry.pose.pose.orientation.w = tempQ.w();
+    pub_latest_odometry_ros.publish(odometry);
+    
+
+    // TF of camera in vins_world in ROS format (change rotation), used for depth registration
+    tf::Quaternion tempQtf(tempQ.x(), tempQ.y(), tempQ.z(), tempQ.w());
+    tf::Transform t_w_body = tf::Transform(tempQtf, tf::Vector3(Tmat_VW_LB.matrix()(0,3), Tmat_VW_LB.matrix()(1,3), Tmat_VW_LB.matrix()(2,3)));
+    tf::StampedTransform trans_world_body_ros = tf::StampedTransform(t_w_body, ros::Time(t), "world", "body_ros");
+    br.sendTransform(trans_world_body_ros);
+
+    if (ALIGN_CAMERA_LIDAR_COORDINATE)
+    {
+        static tf::Transform t_odom_world = tf::Transform(tf::createQuaternionFromRPY(0, 0, M_PI), tf::Vector3(0, 0, 0));
+        if (t - last_align_time > 1.0)
+        {
+            try
+            {
+                tf::StampedTransform trans_odom_baselink;
+                listener.lookupTransform("odom","base_link", ros::Time(0), trans_odom_baselink);
+                t_odom_world = transformConversion(trans_odom_baselink) * transformConversion(trans_world_body_ros).inverse();
+                last_align_time = t;
+            } 
+            catch (tf::TransformException ex){}
+        }
+        br.sendTransform(tf::StampedTransform(t_odom_world, ros::Time(t), "odom", "world"));
+    }
+    else
+    {
+        tf::Transform t_static = tf::Transform(tf::createQuaternionFromRPY(0, 0, M_PI), tf::Vector3(0, 0, 0));
+        br.sendTransform(tf::StampedTransform(t_static, ros::Time(t), "odom", "world"));
+    }
 }
 
 void pubTrackImage(const cv::Mat &imgTrack, const double t)

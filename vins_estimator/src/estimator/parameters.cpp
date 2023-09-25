@@ -19,6 +19,21 @@ std::vector<Eigen::Vector3d> TIC;
 
 Eigen::Vector3d G{0.0, 0.0, 9.8};
 
+std::vector<Eigen::Matrix3d> RCL;
+std::vector<Eigen::Vector3d> TCL;
+
+double L_C_TX;
+double L_C_TY;
+double L_C_TZ;
+double L_C_RX;
+double L_C_RY;
+double L_C_RZ;
+int USE_LIDAR;
+int USE_DENSE_CLOUD;
+int ALIGN_CAMERA_LIDAR_COORDINATE;
+int LIDAR_SKIP;
+std::string POINT_CLOUD_TOPIC;
+
 double BIAS_ACC_THRESHOLD;
 double BIAS_GYR_THRESHOLD;
 double SOLVER_TIME;
@@ -148,6 +163,32 @@ void readParameters(std::string config_file)
         TIC.push_back(T.block<3, 1>(0, 3));
     } 
     
+    cv::Mat cv_R2, cv_T2;
+	fsSettings["extrinsicRotationLidar"] >> cv_R2;
+    fsSettings["extrinsicTranslationLidar"] >> cv_T2;       
+	Eigen::Matrix3d eigen_R2;
+    Eigen::Vector3d eigen_T2;	
+	cv::cv2eigen(cv_R2, eigen_R2);
+    cv::cv2eigen(cv_T2, eigen_T2);
+    Eigen::Quaterniond Q2(eigen_R2);
+    eigen_R2 = Q2.normalized();
+    RCL.push_back(eigen_R2);
+    TCL.push_back(eigen_T2);
+    ROS_INFO_STREAM("Extrinsic_R : " << std::endl << RCL[0]);
+    ROS_INFO_STREAM("Extrinsic_T : " << std::endl << TCL[0].transpose());
+    L_C_TX = fsSettings["lidar_to_cam_tx"];
+    L_C_TY = fsSettings["lidar_to_cam_ty"];
+    L_C_TZ = fsSettings["lidar_to_cam_tz"];
+    L_C_RX = fsSettings["lidar_to_cam_rx"];
+    L_C_RY = fsSettings["lidar_to_cam_ry"];
+    L_C_RZ = fsSettings["lidar_to_cam_rz"];
+    // lidar configurations
+    fsSettings["use_lidar"] >> USE_LIDAR;
+    fsSettings["use_dense_cloud"] >> USE_DENSE_CLOUD;
+    fsSettings["lidar_skip"] >> LIDAR_SKIP;
+    fsSettings["point_cloud_topic"] >> POINT_CLOUD_TOPIC;
+    fsSettings["align_camera_lidar_estimation"] >> ALIGN_CAMERA_LIDAR_COORDINATE;
+
     NUM_OF_CAM = fsSettings["num_of_cam"];
     printf("camera number %d\n", NUM_OF_CAM);
 
@@ -216,4 +257,25 @@ void readParameters(std::string config_file)
     }
 
     fsSettings.release();
+}
+
+float pointDistance(PointType p)
+{
+    return sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+}
+
+float pointDistance(PointType p1, PointType p2)
+{
+    return sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) + (p1.z-p2.z)*(p1.z-p2.z));
+}
+
+void publishCloud(ros::Publisher *thisPub, pcl::PointCloud<PointType>::Ptr thisCloud, ros::Time thisStamp, std::string thisFrame)
+{
+    if (thisPub->getNumSubscribers() == 0)
+        return;
+    sensor_msgs::PointCloud2 tempCloud;
+    pcl::toROSMsg(*thisCloud, tempCloud);
+    tempCloud.header.stamp = thisStamp;
+    tempCloud.header.frame_id = thisFrame;
+    thisPub->publish(tempCloud); 
 }
