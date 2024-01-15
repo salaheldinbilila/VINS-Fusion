@@ -15,6 +15,7 @@ Estimator::Estimator(): f_manager{Rs}
     ROS_INFO("init begins");
     initThreadFlag = false;
     depth_cloud = boost::make_shared<pcl::PointCloud<PointType>>();
+    //initialization_info.clear();
     clearState();
 }
 
@@ -161,14 +162,15 @@ void Estimator::changeSensorType(int use_imu, int use_stereo)
 void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
 {
     inputImageCnt++;
-    map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
+    map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> featureFrame;
     TicToc featureTrackerTime;
     if(_img1.empty())
         featureFrame = featureTracker.trackImage(t, _img);
     else
         featureFrame = featureTracker.trackImage(t, _img, _img1);
     //printf("featureTracker time: %f\n", featureTrackerTime.toc());
-
+    if (DET || SEG)
+        pubFeatureCount(featureTracker.ids.size()-featureFrame.size(),t);
     if (SHOW_TRACK)
     {
         cv::Mat imgTrack = featureTracker.getTrackImage();
@@ -176,19 +178,7 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
     }
     // get time stamp in ros format
     ros::Time stamp(t);
-    // get a vector of the features to get the depth of
-    vector<geometry_msgs::Point32> points;
-    // iterate over the feature frame
-    for (auto frame : featureFrame)
-    {
-        geometry_msgs::Point32 point;
-        point.x = frame.second[0].second(0);
-        point.y = frame.second[0].second(1);
-        point.z = frame.second[0].second(2);
-        points.push_back(point);
-    }
-    sensor_msgs::ChannelFloat32 depth_of_points = depthRegister->get_depth(stamp, _img, depth_cloud, featureTracker.m_camera[0], points);
-
+    depthRegister->get_depth(stamp, _img, depth_cloud, featureTracker.m_camera[0], featureFrame);
     if(MULTIPLE_THREAD)  
     {     
         if(inputImageCnt % 2 == 0)
@@ -227,7 +217,7 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
     }
 }
 
-void Estimator::inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame)
+void Estimator::inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &featureFrame)
 {
     mBuf.lock();
     featureBuf.push(make_pair(t, featureFrame));
@@ -286,7 +276,7 @@ void Estimator::processMeasurements()
     while (1)
     {
         //printf("process measurments\n");
-        pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
+        pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 8, 1> > > > > feature;
         vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
         if(!featureBuf.empty())
         {
@@ -329,7 +319,8 @@ void Estimator::processMeasurements()
                 }
             }
             mProcess.lock();
-            processImage(feature.second, feature.first);
+            processImage(feature.second, //initialization_info, 
+                            feature.first);
             prevTime = curTime;
 
             printStatistics(*this, 0);
@@ -422,7 +413,9 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
     gyr_0 = angular_velocity; 
 }
 
-void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header)
+void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &image,
+                             //const vector<float> &lidar_initialization_info,
+                             const double header)
 {
     ROS_DEBUG("new image coming ------------------------------------------");
     ROS_DEBUG("Adding feature points %lu", image.size());
@@ -442,7 +435,8 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
     ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());
     Headers[frame_count] = header;
 
-    ImageFrame imageframe(image, header);
+    ImageFrame imageframe(image, //lidar_initialization_info, 
+                            header);
     imageframe.pre_integration = tmp_pre_integration;
     all_image_frame.insert(make_pair(header, imageframe));
     tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};

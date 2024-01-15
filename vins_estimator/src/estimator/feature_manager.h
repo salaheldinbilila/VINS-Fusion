@@ -28,7 +28,7 @@ using namespace Eigen;
 class FeaturePerFrame
 {
   public:
-    FeaturePerFrame(const Eigen::Matrix<double, 7, 1> &_point, double td)
+    FeaturePerFrame(const Eigen::Matrix<double, 8, 1> &_point, double td)
     {
         point.x() = _point(0);
         point.y() = _point(1);
@@ -37,10 +37,11 @@ class FeaturePerFrame
         uv.y() = _point(4);
         velocity.x() = _point(5); 
         velocity.y() = _point(6); 
+        depth = _point(7);
         cur_td = td;
         is_stereo = false;
     }
-    void rightObservation(const Eigen::Matrix<double, 7, 1> &_point)
+    void rightObservation(const Eigen::Matrix<double, 8, 1> &_point)
     {
         pointRight.x() = _point(0);
         pointRight.y() = _point(1);
@@ -49,6 +50,7 @@ class FeaturePerFrame
         uvRight.y() = _point(4);
         velocityRight.x() = _point(5); 
         velocityRight.y() = _point(6); 
+        depth = _point(7);
         is_stereo = true;
     }
     double cur_td;
@@ -56,6 +58,7 @@ class FeaturePerFrame
     Vector2d uv, uvRight;
     Vector2d velocity, velocityRight;
     bool is_stereo;
+    double depth; // lidar depth, initialized with -1 from feature points in feature tracker node
 };
 
 class FeaturePerId
@@ -64,14 +67,28 @@ class FeaturePerId
     const int feature_id;
     int start_frame;
     vector<FeaturePerFrame> feature_per_frame;
+
     int used_num;
+    bool is_outlier;
+    bool is_margin;
     double estimated_depth;
+    bool lidar_depth_flag;
     int solve_flag; // 0 haven't solve yet; 1 solve succ; 2 solve fail;
 
-    FeaturePerId(int _feature_id, int _start_frame)
+    FeaturePerId(int _feature_id, int _start_frame, double _measured_depth)
         : feature_id(_feature_id), start_frame(_start_frame),
-          used_num(0), estimated_depth(-1.0), solve_flag(0)
+          used_num(0), estimated_depth(-1.0), lidar_depth_flag(false), solve_flag(0)
     {
+      if (_measured_depth > 0)
+        {
+            estimated_depth = _measured_depth;
+            lidar_depth_flag = true;
+        }
+        else
+        {
+            estimated_depth = -1;
+            lidar_depth_flag = false;
+        }
     }
 
     int endFrame();
@@ -85,7 +102,7 @@ class FeatureManager
     void setRic(Matrix3d _ric[]);
     void clearState();
     int getFeatureCount();
-    bool addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, double td);
+    bool addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &image, double td);
     vector<pair<Vector3d, Vector3d>> getCorresponding(int frame_count_l, int frame_count_r);
     //void updateDepth(const VectorXd &x);
     void setDepth(const VectorXd &x);

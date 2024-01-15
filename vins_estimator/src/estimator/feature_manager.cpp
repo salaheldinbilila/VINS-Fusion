@@ -49,7 +49,7 @@ int FeatureManager::getFeatureCount()
 }
 
 
-bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, double td)
+bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &image, double td)
 {
     ROS_DEBUG("input feature: %d", (int)image.size());
     ROS_DEBUG("num of feature: %d", getFeatureCount());
@@ -77,16 +77,27 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
 
         if (it == feature.end())
         {
-            feature.push_back(FeaturePerId(feature_id, frame_count));
+            // this feature in the image is observed for the first time, create a new feature object
+            feature.push_back(FeaturePerId(feature_id, frame_count,f_per_fra.depth));
             feature.back().feature_per_frame.push_back(f_per_fra);
             new_feature_num++;
         }
         else if (it->feature_id == feature_id)
         {
+            // this feature in the image has been observed before
             it->feature_per_frame.push_back(f_per_fra);
             last_track_num++;
             if( it-> feature_per_frame.size() >= 4)
                 long_track_num++;
+            
+            // sometimes the feature is first observed without depth 
+            // (initialize initial feature depth with current image depth is not exactly accurate if camera moves very fast, then lines bebow can be commented out)
+            if (f_per_fra.depth > 0 && it->lidar_depth_flag == false)
+            {
+                it->estimated_depth = f_per_fra.depth;
+                it->lidar_depth_flag = true;
+                it->feature_per_frame[0].depth = f_per_fra.depth;
+            }
         }
     }
 
@@ -173,7 +184,10 @@ void FeatureManager::removeFailures()
 void FeatureManager::clearDepth()
 {
     for (auto &it_per_id : feature)
+    {
         it_per_id.estimated_depth = -1;
+        it_per_id.lidar_depth_flag = false;
+    }
 }
 
 VectorXd FeatureManager::getDepthVector()
@@ -185,11 +199,12 @@ VectorXd FeatureManager::getDepthVector()
         it_per_id.used_num = it_per_id.feature_per_frame.size();
         if (it_per_id.used_num < 4)
             continue;
-#if 1
-        dep_vec(++feature_index) = 1. / it_per_id.estimated_depth;
-#else
-        dep_vec(++feature_index) = it_per_id->estimated_depth;
-#endif
+
+        // optimized depth after ceres maybe negative, initialize them with default value for this optimization
+        if (it_per_id.estimated_depth > 0)
+            dep_vec(++feature_index) = 1. / it_per_id.estimated_depth;
+        else
+            dep_vec(++feature_index) = 1. / INIT_DEPTH;
     }
     return dep_vec;
 }

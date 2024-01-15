@@ -7,23 +7,22 @@ num_of_cam: 1
 
 imu_topic: "/imu/data"
 image0_topic: "/camera/image_mono"
-output_path: "~/output"
+output_path: "~/output/"
 
-cam0_calib: "test_payload_cam.yaml"
-#cam0_calib: "test_payload_cam1.yaml"
+cam0_calib: "payload_cam_down_NRC1.yaml"
 image_width: 1440
 image_height: 1080
-   
+
+#Lidar info   
+use_lidar: 1
 #Enable deskewed lidar
 #point_cloud_topic: "/lvi_sam/lidar/deskew/cloud_deskewed"
 #Enable raw lidar
-point_cloud_topic: "/velodyne_points"
-use_dense_cloud: 0  # if 0 uses the current scan only for depth enhancement
-
-# Lidar Params
-use_lidar: 1                     # whether use depth info from lidar or not
-lidar_skip: 3                    # skip this amount of scans
+point_cloud_topic: "/velodyne_points" #/scan default
+use_dense_cloud: 1  # if 0 uses the current scan only for depth enhancement
+lidar_skip: 3
 align_camera_lidar_estimation: 1 # align camera and lidar estimation for visualization
+   
 
 # Extrinsic parameter between IMU and Camera.
 estimate_extrinsic: 0   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
@@ -33,9 +32,9 @@ body_T_cam0: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [-0.0009792,   0.00685726,  0.99997601, 0.18648448,
-           0.99931723, -0.03692628,  0.00123178, -0.04199414,
-           0.03693384,  0.99929446, -0.00681642, -0.03693199,
+   data: [-0.01039363,   0.99994595,  0.00027614, -0.27939175,
+           -0.99982944, -0.0103882,  -0.01527021, 0.00394073,
+           -0.01526652,  -0.00043481, 0.99988337, -0.00039529,
            0, 0, 0, 1]
 
 #Rotation from lidar frame to camera frame, cam^R_lidar
@@ -43,24 +42,37 @@ extrinsicRotationLidar: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ -0.0062, -0.9992, -0.0393, 
-            0.0040, 0.0392, -0.9992,
-            1.00, -0.0063, 0.0038]
+#   data: [0.0258,   0.9996,  0.0067, 
+#          0.0005,    -0.0067,  1.0000,
+#          0.9997,    -0.0258,  -0.0007]     
+   data: [ 0.1201,  0.9927,   -0.0042,
+          -0.0165,  0.0062,    0.9998,
+           0.9926, -0.1200,    0.0171]
+
+# lidar to camera extrinsic  -  this is the fine tuning for the Lidar?
+lidar_to_cam_tx: 0
+lidar_to_cam_ty: 0
+lidar_to_cam_tz: 0
+lidar_to_cam_rx: 0
+lidar_to_cam_ry: 0
+lidar_to_cam_rz: 0   #+ve yaw
+
+
+# Original [ -0.0062, -0.9992, -0.0393, 
+#           0.0040, 0.0392, -0.9992,
+#           1.00, -0.0063, 0.0038]
+#Adjustments from nominal for overlay  (ZYX) in degrees
+#1 : 0.3536 0.2311 -2.249
+#2 :   0   -0.36 -0.22   
+
 
 #Translation from lidar frame to camera frame, cam^t_lidar
 extrinsicTranslationLidar: !!opencv-matrix
    rows: 3
    cols: 1
    dt: d
-   data: [0.0923, 0.0388, -0.074]
-
-# lidar to camera extrinsic  -  this is the fine tuning for the Lidar expose using dynamic reconfigure to adjust
-lidar_to_cam_tx: 0
-lidar_to_cam_ty: 0
-lidar_to_cam_tz: 0
-lidar_to_cam_rx: -0.1
-lidar_to_cam_ry: 0
-lidar_to_cam_rz: -0.015   #+ve yaw
+#   data: [-0.0896, 0.3994, 0.0444]
+   data: [-0.0560, 0.3639, 0.0700]
 
 #Multiple thread support
 multiple_thread: 1
@@ -90,7 +102,8 @@ g_norm: 9.803     # gravity magnitude
 
 #unsynchronization parameters
 estimate_td: 0                      # online estimate time offset between camera and imu
-td: -0.02932                        # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
+td: -0.0297405129318                        # initial value of time offset. unit s. readed image clock + td = real image clock (IMU clock)
+# -0.02932 for the un sync data...., +0.006 for synced data (i.e., 6ms capture delay from hardware trigger)
 
 #loop closure parameters
 load_previous_pose_graph: 0        # load and reuse previous pose graph; load from 'pose_graph_save_path'
@@ -99,7 +112,7 @@ save_image: 1                   # save image in pose graph for visualization pru
 
 #segmentation parameter
 seg: 0
-det: 1
+det: 0
 
 #masks in config folder of the same config file
 car_mask: "car_mask.jpg"

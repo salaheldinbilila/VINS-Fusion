@@ -42,6 +42,22 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )
 
+######################
+### Message generation
+######################
+add_message_files(
+  DIRECTORY msg
+  FILES
+  FeatureCount.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs
+  std_msgs
+  nav_msgs
+  sensor_msgs
+  )
 
 catkin_package(
   DEPENDS PCL GTSAM

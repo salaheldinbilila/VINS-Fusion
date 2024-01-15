@@ -65,21 +65,22 @@ public:
             pointsArray[i].resize(num_bins);
     }
 
-    sensor_msgs::ChannelFloat32 get_depth(const ros::Time& stamp_cur, const cv::Mat& imageCur, 
+    void get_depth(const ros::Time& stamp_cur, const cv::Mat& imageCur, 
                                           const pcl::PointCloud<PointType>::Ptr& depthCloud,
                                           const camodocal::CameraPtr& camera_model ,
-                                          const vector<geometry_msgs::Point32>& features_2d)
+                                          map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &featureFrame)
     {
         // 0.1 initialize depth for return
-        sensor_msgs::ChannelFloat32 depth_of_point;
-        depth_of_point.name = "depth";
-        depth_of_point.values.resize(features_2d.size(), -1);
+        //sensor_msgs::ChannelFloat32 depth_of_point;
+        //depth_of_point.name = "depth";
+        //depth_of_point.values.resize(featureFrame.size(), -1);
 
         // 0.2  check if depthCloud available
         if (depthCloud->size() == 0)
         {
             //ROS_ERROR("depth cloud is empty");
-            return depth_of_point;
+            //return depth_of_point;
+            return;
         }
 
         // 0.3 look up transform at current image time
@@ -89,7 +90,8 @@ public:
         } 
         catch (tf::TransformException ex){
             //ROS_ERROR("image no tf");
-            return depth_of_point;
+            //return depth_of_point;
+            return;
         }
 
         double xCur, yCur, zCur, rollCur, pitchCur, yawCur;
@@ -111,10 +113,10 @@ public:
 
         // 0.5 project undistorted normalized (z) 2d features onto a unit sphere
         pcl::PointCloud<PointType>::Ptr features_3d_sphere(new pcl::PointCloud<PointType>());
-        for (int i = 0; i < (int)features_2d.size(); ++i)
+        for (auto& frame : featureFrame)
         {
             // normalize 2d feature to a unit sphere
-            Eigen::Vector3f feature_cur(features_2d[i].x, features_2d[i].y, features_2d[i].z); // z always equal to 1
+            Eigen::Vector3f feature_cur(frame.second[0].second(0), frame.second[0].second(1), frame.second[0].second(2)); // z always equal to 1
             feature_cur.normalize(); 
             // convert to ROS standard
             PointType p;
@@ -179,7 +181,8 @@ public:
             depth_cloud_unit_sphere->push_back(p);
         }
         if (depth_cloud_unit_sphere->size() < 10)
-            return depth_of_point;
+            //return depth_of_point;
+            return;
 
         // 6. create a kd-tree using the spherical depth cloud
         pcl::KdTreeFLANN<PointType>::Ptr kdtree(new pcl::KdTreeFLANN<PointType>());
@@ -241,10 +244,12 @@ public:
         publishCloud(&pub_depth_feature, features_3d_sphere, stamp_cur, "body_ros");
         
         // update depth value for return
-        for (int i = 0; i < (int)features_3d_sphere->size(); ++i)
+        int i = 0;
+        for (auto& frame : featureFrame)
         {
             if (features_3d_sphere->points[i].intensity > 3.0)
-                depth_of_point.values[i] = features_3d_sphere->points[i].intensity;
+                frame.second[0].second(7) = features_3d_sphere->points[i].intensity;
+            i++;
         }
 
         // visualization project points on image for visualization (it's slow!)
@@ -286,7 +291,8 @@ public:
         }
         // disable depth but keep the visuals
         //depth_of_point.values.resize(features_2d.size(), -1);
-        return depth_of_point;
+        //return depth_of_point;
+        return;
     }
 
     void getColor(float p, float np, float&r, float&g, float&b) 
@@ -322,10 +328,12 @@ class Estimator
     // interface
     void initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r);
     void inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
-    void inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame);
+    void inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &featureFrame);
     void inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
-    void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header);
+    void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> &image, 
+                      //const vector<float> &lidar_initialization_info,
+                      const double header);
     void processMeasurements();
     void changeSensorType(int use_imu, int use_stereo);
 
@@ -372,7 +380,7 @@ class Estimator
     std::mutex mPropagate;
     queue<pair<double, Eigen::Vector3d>> accBuf;
     queue<pair<double, Eigen::Vector3d>> gyrBuf;
-    queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > > featureBuf;
+    queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 8, 1> > > > > > featureBuf;
     double prevTime, curTime;
     bool openExEstimation;
 
@@ -452,4 +460,5 @@ class Estimator
     pcl::PointCloud<PointType>::Ptr depth_cloud;
     // global depth register for obtaining depth of a feature
     DepthRegister *depthRegister;
+    vector<float> initialization_info;
 };

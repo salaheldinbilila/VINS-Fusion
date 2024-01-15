@@ -25,6 +25,7 @@ ros::Publisher pub_keyframe_point;
 ros::Publisher pub_extrinsic;
 
 ros::Publisher pub_image_track;
+ros::Publisher pub_feature_count;
 
 CameraPoseVisualization cameraposevisual(1, 0, 0, 1);
 static double sum_of_path = 0;
@@ -47,6 +48,8 @@ void registerPub(ros::NodeHandle &n)
     pub_keyframe_point = n.advertise<sensor_msgs::PointCloud>("keyframe_point", 1000);
     pub_extrinsic = n.advertise<nav_msgs::Odometry>("extrinsic", 1000);
     pub_image_track = n.advertise<sensor_msgs::Image>("image_track", 1000);
+    if(DET || SEG)
+        pub_feature_count = n.advertise<vins::FeatureCount>("feature_count", 1000);
 
     cameraposevisual.setScale(0.1);
     cameraposevisual.setLineWidth(0.01);
@@ -492,4 +495,12 @@ void pubKeyframe(const Estimator &estimator)
         }
         pub_keyframe_point.publish(point_cloud);
     }
+}
+
+void pubFeatureCount(const u_int8_t count,const double t)
+{
+    vins::FeatureCount msg;
+    msg.header.stamp = ros::Time(t);
+    msg.count = count;
+    pub_feature_count.publish(msg);
 }

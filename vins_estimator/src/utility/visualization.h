@@ -27,6 +27,7 @@
 #include <eigen3/Eigen/Dense>
 #include "../estimator/estimator.h"
 #include "../estimator/parameters.h"
+#include "vins/FeatureCount.h"
 #include <fstream>
 
 extern ros::Publisher pub_odometry;
@@ -64,3 +65,5 @@ void pubKeyframe(const Estimator &estimator);
 void pubRelocalization(const Estimator &estimator);
 
 void pubCar(const Estimator & estimator, const std_msgs::Header &header);
+
+void pubFeatureCount(const u_int8_t count,const double t);

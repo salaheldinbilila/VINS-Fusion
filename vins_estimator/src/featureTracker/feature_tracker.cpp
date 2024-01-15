@@ -148,7 +148,7 @@ double FeatureTracker::distance(cv::Point2f &pt1, cv::Point2f &pt2)
     return sqrt(dx * dx + dy * dy);
 }
 
-map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1)
+map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> FeatureTracker::trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat &_img1)
 {
     TicToc t_r;
     cur_time = _cur_time;
@@ -380,7 +380,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         //ROS_INFO("flags matching: %d",(reduce_flag == seg_reject_flag) || (reduce_flag == det_reject_flag));
     }
 
-    map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
+    map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> featureFrame;
     for (size_t i = 0; i < ids.size(); i++)
     {
         if(reduce_flag[i])
@@ -398,9 +398,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         velocity_x = pts_velocity[i].x;
         velocity_y = pts_velocity[i].y;
 
-        Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
-        xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
-        featureFrame[feature_id].emplace_back(camera_id, xyz_uv_velocity);
+        Eigen::Matrix<double, 8, 1> xyz_uv_velocity_depth;
+        xyz_uv_velocity_depth << x, y, z, p_u, p_v, velocity_x, velocity_y, -1.0;
+        featureFrame[feature_id].emplace_back(camera_id, xyz_uv_velocity_depth);
     }
 
     if (!_img1.empty() && stereo_cam)
@@ -420,9 +420,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             velocity_x = right_pts_velocity[i].x;
             velocity_y = right_pts_velocity[i].y;
 
-            Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
-            xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
-            featureFrame[feature_id].emplace_back(camera_id, xyz_uv_velocity);
+            Eigen::Matrix<double, 8, 1> xyz_uv_velocity_depth;
+            xyz_uv_velocity_depth << x, y, z, p_u, p_v, velocity_x, velocity_y, -1.0;
+            featureFrame[feature_id].emplace_back(camera_id, xyz_uv_velocity_depth);
         }
     }
 

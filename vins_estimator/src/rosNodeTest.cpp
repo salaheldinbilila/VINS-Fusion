@@ -33,6 +33,7 @@ queue<sensor_msgs::ImageConstPtr> seg_buf;
 queue<sensor_msgs::ImageConstPtr> det_buf;
 std::mutex mtx_lidar;
 std::mutex m_buf;
+std::mutex m_odom;
 
 // global variable for saving the depthCloud shared between two threads
 pcl::PointCloud<PointType>::Ptr depthCloud(new pcl::PointCloud<PointType>());
@@ -42,6 +43,16 @@ pcl::PointCloud<PointType>::Ptr depthCloudLocal(new pcl::PointCloud<PointType>()
 deque<pcl::PointCloud<PointType>> cloudQueue;
 deque<double> timeQueue;
 
+// global variable saving the lidar odometry
+deque<nav_msgs::Odometry> odomQueue;
+odometryRegister *odomRegister;
+
+void odom_callback(const nav_msgs::Odometry::ConstPtr& odom_msg)
+{
+    m_odom.lock();
+    odomQueue.push_back(*odom_msg);
+    m_odom.unlock();
+}
 
 void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
@@ -247,7 +258,7 @@ void sync_process()
             {
                 time = img0_buf.front()->header.stamp.toSec();
                 header = img0_buf.front()->header;
-                ROS_INFO("Image header: %f",time);
+                //ROS_INFO("Image header: %f",time);
                 if (SEG)
                 {
                     if(!seg_buf.empty())
@@ -282,22 +293,22 @@ void sync_process()
                     {
                         empty_count = 0;
                         det_time = det_buf.front()->header.stamp.toSec();
-                        ROS_INFO("detection time: %f",det_time);
-                        ROS_INFO("detection time diff: %f",det_time-time);
+                        //ROS_INFO("detection time: %f",det_time);
+                        //ROS_INFO("detection time diff: %f",det_time-time);
                         if (det_time < time)
                         {
-                            ROS_INFO("The detection is of an old image, discard");
+                            //ROS_INFO("The detection is of an old image, discard");
                             det_buf.pop();
                         }
                         else if (det_time > time)
                         {
-                            ROS_INFO("Image too late. Use image without detection");
+                            //ROS_INFO("Image too late. Use image without detection");
                             image = getImageFromMsg(img0_buf.front());
                             img0_buf.pop();
                         }
                         else //(det_time == time)
                         {
-                            ROS_INFO("Images match, process both");
+                            //ROS_INFO("Images match, process both");
                             image = getImageFromMsg(img0_buf.front());
                             img0_buf.pop();
                             estimator.featureTracker.det_img = getImageFromMsg(det_buf.front());
@@ -346,6 +357,10 @@ void sync_process()
                 mtx_lidar.lock();
                 *estimator.depth_cloud = *depthCloud;
                 mtx_lidar.unlock();
+                // Get initialization info from lidar odometry
+                m_odom.lock();
+                estimator.initialization_info = odomRegister->getOdometry(odomQueue, time + estimator.td);
+                m_odom.unlock();
                 estimator.inputImage(time, image);
             }
         }
@@ -374,7 +389,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
 
 void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
 {
-    map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
+    map<int, vector<pair<int, Eigen::Matrix<double, 8, 1>>>> featureFrame;
     for (unsigned int i = 0; i < feature_msg->points.size(); i++)
     {
         int feature_id = feature_msg->channels[0].values[i];
@@ -386,6 +401,7 @@ void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
         double p_v = feature_msg->channels[3].values[i];
         double velocity_x = feature_msg->channels[4].values[i];
         double velocity_y = feature_msg->channels[5].values[i];
+        double depth = -1;
         if(feature_msg->channels.size() > 5)
         {
             double gx = feature_msg->channels[6].values[i];
@@ -394,10 +410,12 @@ void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
             pts_gt[feature_id] = Eigen::Vector3d(gx, gy, gz);
             //printf("receive pts gt %d %f %f %f\n", feature_id, gx, gy, gz);
         }
+        if(feature_msg->channels.size() > 9)
+            depth = feature_msg->channels[9].values[i];
         ROS_ASSERT(z == 1);
-        Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
-        xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
-        featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
+        Eigen::Matrix<double, 8, 1> xyz_uv_velocity_depth;
+        xyz_uv_velocity_depth << x, y, z, p_u, p_v, velocity_x, velocity_y, depth;
+        featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity_depth);
     }
     double t = feature_msg->header.stamp.toSec();
     estimator.inputFeature(t, featureFrame);
@@ -475,32 +493,37 @@ int main(int argc, char **argv)
 
     registerPub(n);
     estimator.depthRegister = new DepthRegister(n);
+    odomRegister = new odometryRegister(n);
 
     ros::Subscriber sub_imu;
     if(USE_IMU)
         sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
     ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
-    ros::Subscriber sub_lidar = n.subscribe(POINT_CLOUD_TOPIC, 100,    lidar_callback);
     ros::Subscriber sub_img1;
-    ros::Subscriber sub_seg;
-    ros::Subscriber sub_det;
-    if(SEG)
-        sub_seg = n.subscribe("/semantic", 100, seg_callback);      // segmentation subscriber
-    if(DET)
-        sub_det = n.subscribe("/detect", 100, det_callback);      // detection subscriber
     if(STEREO)
         sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
-    if (!USE_LIDAR)
-        sub_lidar.shutdown();
+    ros::Subscriber sub_seg;
+    if(SEG)
+        sub_seg = n.subscribe("/semantic", 100, seg_callback);      // segmentation subscriber
+    ros::Subscriber sub_det;
+    if(DET)
+        sub_det = n.subscribe("/detect", 100, det_callback);      // detection subscriber
+    ros::Subscriber sub_odom;
+    ros::Subscriber sub_lidar;
+    if (USE_LIDAR)
+    {
+        sub_lidar = n.subscribe(POINT_CLOUD_TOPIC, 100,    lidar_callback);
+        sub_odom = n.subscribe("odometry/imu", 5000, odom_callback);
+    }
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);
     ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);
 
     std::thread sync_thread{sync_process};
     //ros::spin();
-    // four ROS spinners for parallel processing (segmentation, detection, image and lidar)
-    ros::MultiThreadedSpinner spinner(4);
+    // four ROS spinners for parallel processing (segmentation, detection, image, lidar and lidar odometry)
+    ros::MultiThreadedSpinner spinner(7);
     spinner.spin();
 
     return 0;
