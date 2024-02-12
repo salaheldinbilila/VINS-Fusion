@@ -66,6 +66,12 @@ double F_THRESHOLD;
 int SHOW_TRACK;
 int FLOW_BACK;
 
+// file saving
+int SAVE_GROUNDTRUTH;
+int USE_PPK;
+int RTK_UNRELIABLE;
+std::string TEST_NAME;
+std::string PPK_POS_FILE;
 
 template <typename T>
 T readParam(ros::NodeHandle &n, std::string name)
@@ -255,6 +261,12 @@ void readParameters(std::string config_file)
         ESTIMATE_TD = 0;
         printf("no imu, fix extrinsic param; no time offset calibration\n");
     }
+    //file saving & ground truth
+    SAVE_GROUNDTRUTH = fsSettings["save_groundtruth"];
+    USE_PPK = fsSettings["use_ppk"];
+    RTK_UNRELIABLE = fsSettings["rtk_unreliable"];
+    fsSettings["test_name"] >> TEST_NAME;
+    fsSettings["ppk_pos_file"] >> PPK_POS_FILE;
 
     fsSettings.release();
 }

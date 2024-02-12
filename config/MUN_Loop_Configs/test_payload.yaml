@@ -99,8 +99,15 @@ save_image: 1                   # save image in pose graph for visualization pru
 
 #segmentation parameter
 seg: 0
-det: 1
+det: 0
 
 #masks in config folder of the same config file
 car_mask: "car_mask.jpg"
 bus_mask: "bus_mask.jpg"
+
+#file saving and groundtruth
+test_name: "mun_loop_devins"
+save_groundtruth: 1
+use_ppk: 0
+rtk_unreliable: 0
+ppk_pos_file: ""

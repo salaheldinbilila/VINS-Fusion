@@ -177,8 +177,11 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
         pubTrackImage(imgTrack, t);
     }
     // get time stamp in ros format
+    if(USE_LIDAR)
+    {
     ros::Time stamp(t);
     depthRegister->get_depth(stamp, _img, depth_cloud, featureTracker.m_camera[0], featureFrame);
+    }
     if(MULTIPLE_THREAD)  
     {     
         if(inputImageCnt % 2 == 0)

@@ -43,9 +43,9 @@ map<double, vector<double>> GPSPositionMap;
 double last_vio_t = -1;
 std::queue<sensor_msgs::NavSatFixConstPtr> gpsQueue;
 std::mutex m_buf;
-//bool rtk_unreliable = false;  //TODO  : send to config file
-//bool use_ppk = false;  //TODO  : send to config file
-//std::string ppk_pos_file = "/media/salah/8ADC39F3DC39D9E1/bell412_dataset6/bell412_dataset6_frl.pos"; //TODO  : send to config file
+bool rtk_unreliable = false;  //TODO  : send to config file
+bool use_ppk = false;  //TODO  : send to config file
+std::string ppk_pos_file = "/media/salah/8ADC39F3DC39D9E1/bell412_dataset6/bell412_dataset6_frl.pos"; //TODO  : send to config file
 std::string nmeaSentence = {};
 std::string nmea_time;
 boost::posix_time::time_duration nmea_time_pval;
@@ -55,7 +55,7 @@ boost::gregorian::date my_posix_date;
 boost::posix_time::time_duration my_time_of_day;
 
 
-std::ifstream myfile1;
+std::ifstream myfile1 (ppk_pos_file);
 std::string line;
 bool skip_read = false;
 sensor_msgs::NavSatFix fix_ppk_msg;
@@ -102,7 +102,7 @@ void publish_car_model(double t, Eigen::Vector3d t_w_car, Eigen::Quaterniond q_w
 
 void GPS_callback(const sensor_msgs::NavSatFixConstPtr &GPS_msg)
 {
-    if(globalEstimator.use_ppk) return;
+    if(use_ppk) return;
 
     m_buf.lock();
     gpsQueue.push(GPS_msg);
@@ -192,7 +192,7 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
             int fixstatus = GPS_msg->status.status;  //this is 2 for rtk and 
             double pos_accuracy = GPS_msg->position_covariance[0];
             if(pos_accuracy > 0 && fixstatus >= 0){
- 		if(globalEstimator.rtk_unreliable){
+ 		if(rtk_unreliable ){
  			if(fixstatus == 2 ){
                 	//printf("synced| receive covariance %lf | fix status(2:RTK) %i \n", pos_accuracy, fixstatus); // use this to check gps sync errors
                 	globalEstimator.inputGPS(t, latitude, longitude, altitude, pos_accuracy); }}
@@ -421,9 +421,11 @@ void nmeaCallback(const nmea_msgs::Sentence::ConstPtr& msg)
                      //if(nmea_fix==5){   //5 is RTK
                      //globalEstimator.inputPPKviz(fix_ppk_msg.header.stamp.toSec(), nmea_lat, nmea_lon, nmea_alt, sdn);}
 		     
-                     if(globalEstimator.use_ppk) {
-			// include in the GPS qextern int SAVE_GROUNDTRUTH;
-
+                     if(use_ppk) {
+			// include in the GPS q
+                     sensor_msgs::NavSatFixConstPtr fix_ppk_msg_const_pointer( new sensor_msgs::NavSatFix(fix_ppk_msg) );
+                     m_buf.lock();
+    		     gpsQueue.push(fix_ppk_msg_const_pointer);
                      m_buf.unlock();
 		     }	
 		} 
@@ -438,36 +440,12 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "globalEstimator");
     ros::NodeHandle n("~");
-    //file saving & groundtruth
-    ros::param::get("/test_name", globalEstimator.test_name);
-    ros::param::get("/save_groundtruth", globalEstimator.save_groundtruth);
-    ros::param::get("/use_ppk", globalEstimator.use_ppk);
-    ros::param::get("/rtk_unreliable", globalEstimator.rtk_unreliable);
-    globalEstimator.algo_file.open(globalEstimator.test_name + ".txt", std::ios::trunc);
-    if(globalEstimator.save_groundtruth)
-    {
-        globalEstimator.gps_filename = globalEstimator.test_name + "_gps";
-        globalEstimator.gt_filename = globalEstimator.test_name + "_gt";
-        if (globalEstimator.use_ppk)
-        {
-            globalEstimator.gps_filename = globalEstimator.gps_filename + "_ppk";
-            globalEstimator.gt_filename = globalEstimator.gt_filename + "_ppk";
-        }
-        globalEstimator.gps_file.open(globalEstimator.gps_filename + ".txt", std::ios::trunc);
-    }
-    /*
-    if(globalEstimator.use_ppk)
-    {
-        ros::param::get("/ppk_pos_file", globalEstimator.ppk_pos_file);
-        myfile1.open(globalEstimator.ppk_pos_file);
-    }
-    */
 
     global_path = &globalEstimator.global_path;
     gps_path = &globalEstimator.gps_path;
     ppk_path = &globalEstimator.ppk_path;
 
-
+   
     ros::Subscriber sub_nmea = n.subscribe("/nmea_sentence", 100, nmeaCallback);
     ros::Subscriber sub_GPS = n.subscribe("/fix", 100, GPS_callback);
     ros::Subscriber sub_vio = n.subscribe("/vins_estimator/odometry", 100, vio_callback);

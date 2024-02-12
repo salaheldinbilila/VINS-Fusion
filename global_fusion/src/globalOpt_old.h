@@ -38,17 +38,6 @@ public:
 	nav_msgs::Path global_path;
 	nav_msgs::Path gps_path;
 	nav_msgs::Path ppk_path;
-	//file saving & groundtruth
-	int save_groundtruth;
-	int use_ppk;
-	int rtk_unreliable;
-	std::string test_name;
-	std::string ppk_pos_file;
-	std::string gps_filename;
-	std::string gt_filename;
-	std::ofstream algo_file;
-	std::ofstream gps_file;
-	std::ofstream gt_file;
 
 private:
 	void GPS2XYZ(double latitude, double longitude, double altitude, double* xyz);
@@ -64,16 +53,14 @@ private:
 	GeographicLib::LocalCartesian geoConverter;
 	std::mutex mPoseMap;
 	Eigen::Matrix4d WGPS_T_WVIO;
-	Eigen::Matrix4d WGPS_T_WVIO_viz;
-	int update_count;
-	int GTframeCount;
-	/*
-    std::ofstream outfileOdom;
-    std::ofstream outfileGt;
+        Eigen::Matrix4d WGPS_T_WVIO_viz;
+        int update_count;
+        int GTframeCount;
+        std::ofstream outfileOdom;
+        std::ofstream outfileGt;
 	std::ofstream outfileVINS; //rav
 	std::ofstream outfileGPS; //rav
 	std::ofstream outfileFusion; //rav
-	*/
 	Eigen::Vector3d lastP;
 	Eigen::Quaterniond lastQ;
 	std::thread threadOpt;

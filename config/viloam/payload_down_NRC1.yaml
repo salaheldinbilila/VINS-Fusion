@@ -73,3 +73,13 @@ save_image: 1                   # save image in pose graph for visualization pru
 #segmentation parameter
 seg: 1
 det: 0
+
+#file saving and groundtruth
+test_name: "bell6_vins"
+save_groundtruth: 1
+use_ppk: 0
+rtk_unreliable: 0
+#lighthouse
+#ppk_pos_file: "/media/salah/8ADC39F3DC39D9E1/flight_dataset5_ppk.pos"
+#bell412 dataset 6
+ppk_pos_file: "/home/salah/Desktop/bell412_dataset6/bell412_dataset6_frl.pos"

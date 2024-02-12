@@ -90,13 +90,16 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
             if( it-> feature_per_frame.size() >= 4)
                 long_track_num++;
             
+            if (USE_LIDAR)
+            {            
             // sometimes the feature is first observed without depth 
             // (initialize initial feature depth with current image depth is not exactly accurate if camera moves very fast, then lines bebow can be commented out)
-            if (f_per_fra.depth > 0 && it->lidar_depth_flag == false)
-            {
-                it->estimated_depth = f_per_fra.depth;
-                it->lidar_depth_flag = true;
-                it->feature_per_frame[0].depth = f_per_fra.depth;
+                if (f_per_fra.depth > 0 && it->lidar_depth_flag == false)
+                {
+                    it->estimated_depth = f_per_fra.depth;
+                    it->lidar_depth_flag = true;
+                    it->feature_per_frame[0].depth = f_per_fra.depth;
+                }
             }
         }
     }

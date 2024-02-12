@@ -117,3 +117,13 @@ det: 0
 #masks in config folder of the same config file
 car_mask: "car_mask.jpg"
 bus_mask: "bus_mask.jpg"
+
+#file saving and groundtruth
+test_name: "lighthouse_devins"
+save_groundtruth: 1
+use_ppk: 0
+rtk_unreliable: 0
+#lighthouse
+ppk_pos_file: "/media/salah/8ADC39F3DC39D9E1/flight_dataset5_ppk.pos"
+#bell412 dataset 6
+#ppk_pos_file: "/home/salah/Desktop/bell412_dataset6/bell412_dataset6_frl.pos"

@@ -125,6 +125,12 @@ extern int MIN_DIST;
 extern double F_THRESHOLD;
 extern int SHOW_TRACK;
 extern int FLOW_BACK;
+// file saving & groundtruth
+extern int SAVE_GROUNDTRUTH;
+extern int USE_PPK;
+extern int RTK_UNRELIABLE;
+extern std::string TEST_NAME;
+extern std::string PPK_POS_FILE;
 
 void readParameters(std::string config_file);
 float pointDistance(PointType p);

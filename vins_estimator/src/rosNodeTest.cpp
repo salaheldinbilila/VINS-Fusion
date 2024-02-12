@@ -484,6 +484,12 @@ int main(int argc, char **argv)
     estimator.setParameter();
     estimator.featureTracker.car_mask = cv::imread(CAR_MASK, 0);
     estimator.featureTracker.bus_mask = cv::imread(BUS_MASK, 0);
+    //file saving & groundtruth
+    ros::param::set("/test_name", TEST_NAME);
+    ros::param::set("/use_ppk", USE_PPK);
+    ros::param::set("/save_groundtruth", SAVE_GROUNDTRUTH);
+    ros::param::set("/rtk_unreliable", RTK_UNRELIABLE);
+    ros::param::set("/ppk_pos_file", PPK_POS_FILE);
 
 #ifdef EIGEN_DONT_PARALLELIZE
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");
@@ -509,12 +515,12 @@ int main(int argc, char **argv)
     ros::Subscriber sub_det;
     if(DET)
         sub_det = n.subscribe("/detect", 100, det_callback);      // detection subscriber
-    ros::Subscriber sub_odom;
+    //ros::Subscriber sub_odom;
     ros::Subscriber sub_lidar;
     if (USE_LIDAR)
     {
         sub_lidar = n.subscribe(POINT_CLOUD_TOPIC, 100,    lidar_callback);
-        sub_odom = n.subscribe("odometry/imu", 5000, odom_callback);
+        //sub_odom = n.subscribe("odometry/imu", 5000, odom_callback);
     }
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);

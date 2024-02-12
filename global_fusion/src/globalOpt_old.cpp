@@ -16,22 +16,19 @@
 
 int optcounter = 0;
 int gpsPosCounter = 0;
-int algoPosCounter = 0;
+int vinsPosCounter = 0;
 int updateGlobalPathCount = 0;
 
 
-GlobalOptimization::GlobalOptimization()
-/*
-:
+GlobalOptimization::GlobalOptimization():
 outfileOdom("resultsOdom.txt", std::ios_base::trunc),
 outfileGt("resultsGt.txt", std::ios_base::trunc),
-outfileVINS("VINS_LH.txt", std::ios_base::trunc),
-outfileGPS("GPS_LH.txt", std::ios_base::trunc),
-outfileFusion("Fusion_LH.txt", std::ios_base::trunc)
+//outfileVINS("VINS_LH.txt", std::ios_base::trunc),
+//outfileGPS("GPS_LH.txt", std::ios_base::trunc),
+//outfileFusion("Fusion_LH.txt", std::ios_base::trunc)
 outfileVINS("VINS_bell412_dataset1_ppk.txt", std::ios_base::trunc),
 outfileGPS("GPS_bell412_dataset1_ppk.txt", std::ios_base::trunc),
 outfileFusion("Fusion_bell412_dataset1_ppk.txt", std::ios_base::trunc)
-*/
 {
     initGPS = false;
     newGPS = false;
@@ -90,27 +87,26 @@ void GlobalOptimization::inputOdom(double t, Eigen::Vector3d OdomP, Eigen::Quate
     Eigen::Matrix3d odomR = OdomQ.normalized().toRotationMatrix();
     //std::cout << "VINS Rotm: \n" << odomR << std::endl;
     //std::ofstream foutE("VINS_LH.txt", std::ios::app);
+    std::ofstream foutE("VINS_bell412_dataset1_ppk.txt", std::ios::app); 
     //std::ofstream foutE("resultsOdomRaw.txt", std::ios::app);
-
-    //std::ofstream algo_file(test_name + ".txt", std::ios::trunc); 
-    algoPosCounter++;
-    algo_file.setf(std::ios::fixed, std::ios::floatfield);
-    algo_file.precision(0);
-    algo_file << algoPosCounter << " ";
-    algo_file.precision(9);
-    algo_file << t << " "
-          << odomR(0,0) << " "
-          << odomR(0,1) << " "
-          << odomR(0,2) << " "
-          << OdomP.x()  << " "
-          << odomR(1,0) << " "
-          << odomR(1,1) << " "
-          << odomR(1,2) << " "
-          << OdomP.y()  << " "
-          << odomR(2,0) << " "
-          << odomR(2,1) << " "
-          << odomR(2,2) << " "
-          << OdomP.z()  << std::endl;
+    vinsPosCounter++;
+    foutE.setf(std::ios::fixed, std::ios::floatfield);
+    foutE.precision(0);
+    foutE << vinsPosCounter << " ";
+    foutE.precision(9);
+    foutE << t  << " "
+           << odomR(0,0) << " "
+           << odomR(0,1) << " "
+           << odomR(0,2) << " "
+            << OdomP.x()  << " "
+            << odomR(1,0) << " "
+            << odomR(1,1) << " "
+            << odomR(1,2) << " "
+            << OdomP.y()  << " "
+            << odomR(2,0) << " "
+            << odomR(2,1) << " "
+            << odomR(2,2) << " "
+            << OdomP.z()  << std::endl;
           //<< OdomP.x()  << " "
           //<< OdomP.y()  << " "
           //<< OdomP.z()  << std::endl;
@@ -173,8 +169,8 @@ void GlobalOptimization::inputOdom(double t, Eigen::Vector3d OdomP, Eigen::Quate
     //if (update_count <300){
         WGPS_T_WVIO_viz = WGPS_T_WVIO; 
     	update_count++;
-        //if (update_count ==300)
-        //  printf("*********************WGPS_T_WVIO_viz fixed*********************\n");
+        if (update_count ==300)
+          printf("*********************WGPS_T_WVIO_viz fixed*********************\n");
     }
  
     static tf2_ros::TransformBroadcaster brOpGPS;
@@ -215,25 +211,18 @@ void GlobalOptimization::inputGPS(double t, double latitude, double longitude, d
 	vector<double> tmp{xyz[0], xyz[1], xyz[2], posAccuracy};
 	GPSPositionMap[t] = tmp;
     newGPS = true;
-    if (save_groundtruth)
-    {
-        /*
-        std::string gps_filename = test_name + "_gps";
-        if (use_ppk)
-            gps_filename = gps_filename + "_ppk";
-        std::ofstream gps_file(gps_filename + ".txt", std::ios::trunc);
-        */
-        //std::ofstream foutF("GPS_LH.txt", std::ios::app); 
-        gpsPosCounter++;
-        gps_file.setf(std::ios::fixed, std::ios::floatfield);
-        gps_file.precision(0);
-        gps_file << gpsPosCounter << " ";
-        gps_file.precision(9);
-        gps_file << t  << " "
-            << xyz[0]  << " "
-            << xyz[1]  << " "
-            << xyz[2]  << std::endl;
-    }
+
+    std::ofstream foutF("GPS_bell412_dataset1_ppk.txt", std::ios::app);
+    //std::ofstream foutF("GPS_LH.txt", std::ios::app); 
+    gpsPosCounter++;
+    foutF.setf(std::ios::fixed, std::ios::floatfield);
+    foutF.precision(0);
+    foutF << gpsPosCounter << " ";
+    foutF.precision(9);
+    foutF << t  << " "
+          << xyz[0]  << " "
+          << xyz[1]  << " "
+          << xyz[2]  << std::endl;
 
 }
 
@@ -474,65 +463,12 @@ void GlobalOptimization::updateGlobalPath()
     iterFull_gOdom = globalPoseMap.begin();
     //full frame count iter
 
-    //if(updateGlobalPathCount >= 545) //bell412_dataset1 - 149|bell412_dataset5 - 136 fusion| dataset3 - 150 | dataset4 - 155
-    //if(0) //quarry1-102 | quarry2 - 132 (start-450 stop-269) | quarry3-240 | mun loop - 545
-    //{
-        int GTframeCountFull = 0;
-        //std::ofstream foutG("Fusion_LH.txt", std::ios::app);
-    if (save_groundtruth)
-    {
-        /*
-        std::string gt_filename = test_name + "_gt";
-        if (use_ppk)
-            gt_filename = gt_filename + "_ppk";
-        */
-        gt_file.open(gt_filename + ".txt");
-        for(iterFull_gOdom = globalPoseMap.begin(); iterFull_gOdom != globalPoseMap.end(); iterFull_gOdom++)
-        {
-            //read map
-            odomPAll.x() = iterFull_gOdom->second[0];
-            odomPAll.y() = iterFull_gOdom->second[1];
-            odomPAll.z() = iterFull_gOdom->second[2];
-            odomQAll.w() = iterFull_gOdom->second[3];
-            odomQAll.x() = iterFull_gOdom->second[4];
-            odomQAll.y() = iterFull_gOdom->second[5];
-            odomQAll.z() = iterFull_gOdom->second[6];
-
-            //calculate pose
-            Eigen::Quaterniond globalQAll;
-            globalQAll = WGPS_T_WVIO_viz.block<3, 3>(0, 0) * odomQAll;
-            Eigen::Vector3d globalPAll = WGPS_T_WVIO_viz.block<3, 3>(0, 0) * odomPAll + WGPS_T_WVIO_viz.block<3, 1>(0, 3);
-            Eigen::Matrix3d globalRAll = globalQAll.normalized().toRotationMatrix();  
-            //std::cout << "Gloabal Rotm: " << globalRAll << std::endl;
-
-            GTframeCountFull++;
-            gt_file.setf(std::ios::fixed, std::ios::floatfield);
-            gt_file.precision(0);
-            gt_file << GTframeCountFull << " ";
-            gt_file.precision(9);
-            gt_file << iterFull_gOdom->first << " "
-                << globalRAll(0,0) << " "
-                << globalRAll(0,1) << " "
-                << globalRAll(0,2) << " "
-                << globalPAll.x()  << " "
-                << globalRAll(1,0) << " "
-                << globalRAll(1,1) << " "
-                << globalRAll(1,2) << " "
-                << globalPAll.y()  << " "
-                << globalRAll(2,0) << " "
-                << globalRAll(2,1) << " "
-                << globalRAll(2,2) << " "
-                << globalPAll.z()  << std::endl;
-        }
-        gt_file.close();
-    }
-    //}
     // time sequence check-k  
     double time_first = iter->first;
     for(int j = 0;j < GTframeCount; j++, iter++, iter2++){ // go to the current frame
     }
-    //std::ofstream foutC("resultsOdom.txt", std::ios::app);  
-    //std::ofstream foutD("resultsGt.txt", std::ios::app); 
+    std::ofstream foutC("resultsOdom.txt", std::ios::app);  
+    std::ofstream foutD("resultsGt.txt", std::ios::app); 
     //init text file for full path after optimization
     //std::ofstream foutE("resultsGtFullAfterOpti.txt", std::ios::app);
 
@@ -588,8 +524,7 @@ void GlobalOptimization::updateGlobalPath()
              
 		      Eigen::Matrix3d globalR = globalQ.normalized().toRotationMatrix();   
               //std::cout << "Gloabal Rotm: " << globalR << std::endl;
-	    	  /*
-              foutC.setf(std::ios::fixed, std::ios::floatfield);
+	    	  foutC.setf(std::ios::fixed, std::ios::floatfield);
 	    	  foutC.precision(0);
 		      //foutC << header.stamp.toSec() * 1e9 << ",";
               foutC << GTframeCount << " "; //odom
@@ -606,13 +541,60 @@ void GlobalOptimization::updateGlobalPath()
 				    << globalR(2,1) << " "
 				    << globalR(2,2) << " "
 				    << globalP.z()  << " "
-                    << iter->first << std::endl;
-            */
+                    << iter->first-time_first << std::endl;
+
                 //write the whole map to a new file
                 if(printOnceInTerminal){
                     std::cout << "global Map size: " << globalPoseMap.size() << '\n';
                     std::cout << "Map Update Counter:  " << updateGlobalPathCount << '\n';
                 }
+
+                if(updateGlobalPathCount >= 545) //bell412_dataset1 - 149|bell412_dataset5 - 136 fusion| dataset3 - 150 | dataset4 - 155
+                //if(0) //quarry1-102 | quarry2 - 132 (start-450 stop-269) | quarry3-240 | mun loop - 545
+                {
+                    int GTframeCountFull = 0;
+                    //std::ofstream foutG("Fusion_LH.txt", std::ios::app);
+                    std::ofstream foutG("Fusion_bell412_dataset1_ppk.txt", std::ios::app);
+                    for(iterFull_gOdom = globalPoseMap.begin(); iterFull_gOdom != globalPoseMap.end(); iterFull_gOdom++)
+                    {
+                        //read map
+                        odomPAll.x() = iterFull_gOdom->second[0];
+                        odomPAll.y() = iterFull_gOdom->second[1];
+                        odomPAll.z() = iterFull_gOdom->second[2];
+                        odomQAll.w() = iterFull_gOdom->second[3];
+                        odomQAll.x() = iterFull_gOdom->second[4];
+                        odomQAll.y() = iterFull_gOdom->second[5];
+                        odomQAll.z() = iterFull_gOdom->second[6];
+
+                        //calculate pose
+                        Eigen::Quaterniond globalQAll;
+                        globalQAll = WGPS_T_WVIO_viz.block<3, 3>(0, 0) * odomQAll;
+                        Eigen::Vector3d globalPAll = WGPS_T_WVIO_viz.block<3, 3>(0, 0) * odomPAll + WGPS_T_WVIO_viz.block<3, 1>(0, 3);
+                        Eigen::Matrix3d globalRAll = globalQAll.normalized().toRotationMatrix();  
+                        //std::cout << "Gloabal Rotm: " << globalRAll << std::endl;
+
+                        GTframeCountFull++;
+                        foutG.setf(std::ios::fixed, std::ios::floatfield);
+                        foutG.precision(0);
+                        foutG << GTframeCountFull << " ";
+                        foutG.precision(9);
+                        foutG << ros::Time(iterFull_gOdom->first) << " " //added time - check
+                            << globalRAll(0,0) << " "
+                            << globalRAll(0,1) << " "
+                            << globalRAll(0,2) << " "
+                            << globalPAll.x()  << " "
+                            << globalRAll(1,0) << " "
+                            << globalRAll(1,1) << " "
+                            << globalRAll(1,2) << " "
+                            << globalPAll.y()  << " "
+                            << globalRAll(2,0) << " "
+                            << globalRAll(2,1) << " "
+                            << globalRAll(2,2) << " "
+                            << globalPAll.z()  << std::endl;
+                    }
+                }
+                
+
     		}
 
 		        gtP.x() = iter2->second[0];
@@ -646,8 +628,7 @@ void GlobalOptimization::updateGlobalPath()
                 } 
                 
 		      Eigen::Matrix3d gtR = gtQ.normalized().toRotationMatrix();   
-	    	  /*
-              foutD.setf(std::ios::fixed, std::ios::floatfield);
+	    	  foutD.setf(std::ios::fixed, std::ios::floatfield);
 	    	  foutD.precision(0);
 		      //foutC << header.stamp.toSec() * 1e9 << ",";
               foutD << GTframeCount << " "; //gt
@@ -664,15 +645,14 @@ void GlobalOptimization::updateGlobalPath()
 				    << gtR(2,1) << " "
 				    << gtR(2,2) << " "
 				    << gtP.z()  << " "
-                    << iter2->first << std::endl;
-              */
+                    << iter2->first-time_first << std::endl;
     		}
     }
      // time sequence check -k
     //std::cout <<  std::endl;
     //std::cout <<  localPoseMap.end()->first <<std::endl;
-    //foutC.close();
-    //foutD.close();
+    foutC.close();
+    foutD.close();
     //foutE.close();
     //save the last pose when everything finish running -> 
     //fix the first orientation from the last saved pose-> transformation of GPS to WORLD
